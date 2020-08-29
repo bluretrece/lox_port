@@ -85,7 +85,15 @@ impl Scanner {
             self.line,
         ))
     }
-
+    
+    pub fn advance_if_then(&mut self, next: char) -> bool {
+        if self.is_at_end() { return false }
+        else if self.source.chars().nth(self.current).unwrap() != next { return false }
+        else {
+            self.current += 1;
+            true
+        }
+    }
     pub fn scan_token(&mut self) {
         let c = self.advance();
 
@@ -100,6 +108,11 @@ impl Scanner {
             '+' => self.add_token(TokenType::PLUS),
             ';' => self.add_token(TokenType::SEMICOLON),
             '*' => self.add_token(TokenType::STAR),
+            '!' => {
+                if self.advance_if_then('='){
+                    self.add_token(TokenType::BANG_EQUAL)
+                }
+            }
             _ => print!("Unexpected character."),
         }
     }
