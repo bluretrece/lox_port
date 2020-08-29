@@ -110,11 +110,45 @@ impl Scanner {
             '*' => self.add_token(TokenType::STAR),
             '!' => {
                 if self.advance_if_then('='){
+
                     self.add_token(TokenType::BANG_EQUAL)
                 }
-            }
+            },
+            '=' => {
+                if self.advance_if_then('=') {
+                    self.add_token(TokenType::EQUAL_EQUAL)
+                }
+            },
+            '<' => {
+                if self.advance_if_then('=') {
+                    self.add_token(TokenType::LESS_EQUAL)
+                }
+            },
+            '>' => {
+                if self.advance_if_then('=') {
+                    self.add_token(TokenType::GREATER_EQUAL)
+                }
+            },
+            '/' => {
+                if self.advance_if_then('/') {
+                    while self.peek() != '\n' && !self.is_at_end() {
+                        self.advance();
+                    }
+                } else {
+                    self.add_token(TokenType::SLASH);
+                }
+            },
+            ' ' | '\r' | '\t' => (),
+            '\n' => self.line+=1,
             _ => print!("Unexpected character."),
         }
+    }
+
+    // advance()-like function, but doesn't consumes the character.
+    // returns a reference to the next character.
+    pub fn peek(&self) -> char {
+        if self.is_at_end() { return '\0' }
+        else { self.source.chars().nth(self.current).unwrap() }
     }
 
     pub fn scan_tokens(&mut self) -> &Vec<Token> {
@@ -208,6 +242,32 @@ mod tests {
                     lexeme: String::from(""),
                     literal: None,
                     line: 1,
+                },
+            )
+        );
+    }
+
+    #[test]
+    fn free_form_code_test() {
+        let mut input = "/".to_string();
+        let mut scanner = Scanner::new(input);
+
+        scanner.scan_tokens();
+
+        assert_eq!(
+            scanner.tokens_helper(),
+            vec!(
+                Token {
+                    of_type: TokenType::SLASH,
+                    lexeme: String::from("/"),
+                    literal: None,
+                    line: 1,
+                },
+                Token {
+                    of_type: TokenType::EOF,
+                    lexeme: String::from(""),
+                    literal: None,
+                    line:1
                 },
             )
         );
