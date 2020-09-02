@@ -3,10 +3,10 @@ use super::token_type::*;
 use std::fmt;
 #[derive(Eq, PartialEq, PartialOrd)]
 pub struct Token {
-    of_type: TokenType,
-    lexeme: String,
-    literal: Option<Literal>,
-    line: usize,
+    pub of_type: TokenType,
+    pub lexeme: String,
+    pub literal: Option<Literal>,
+    pub line: usize,
 }
 
 impl fmt::Debug for Token {

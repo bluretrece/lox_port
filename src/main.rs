@@ -19,15 +19,15 @@ fn run_file(file: &String) {
 }
 
 pub struct Scanner {
-    source: String,
-    tokens: Vec<Token>,
-    start: usize,
-    current: usize,
-    line: usize,
+    pub source: String,
+    pub tokens: Vec<Token>,
+    pub start: usize,
+    pub current: usize,
+    pub line: usize,
 }
 
 impl Scanner {
-    fn new(source: String) -> Self {
+    pub fn new(source: String) -> Self {
         Self {
             source: source,
             tokens: Vec::new(),
