@@ -1,4 +1,4 @@
-#[derive(Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, Clone, PartialEq, PartialOrd)]
 pub enum TokenType {
     // Single-character tokens.
     LEFT_PAREN,

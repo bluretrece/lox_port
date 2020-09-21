@@ -6,11 +6,630 @@ pub mod token_type;
 use literal::*;
 use token::*;
 use token_type::*;
-
+pub type Result<T> = std::result::Result<T, String>;
 use std::{
     fs,
     io::{self, Write},
 };
+
+/// TODO
+/// Improve error handling.
+///
+/// Modify the run function so it now can succesfully handle a parser as well as its
+/// error handling function.
+
+pub enum ParseError {
+    SyntaxError(Token, String),
+}
+
+#[derive(PartialEq, Debug)]
+struct Parser {
+    tokens: Vec<Token>,
+    current: usize,
+}
+
+struct Interpreter;
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub enum Object {
+    Boolean(bool),
+    Number(i32),
+    Str(String),
+    Undefined,
+    Nil,
+}
+
+impl Object {
+    pub fn from_literal(literal: &Literal) -> Self {
+        match literal {
+            Literal::String(x) => Object::Str(x.clone()),
+            Literal::Number(x) => Object::Number(*x),
+            Literal::Boolean(x) => Object::Boolean(*x),
+            _ => Object::Undefined,
+        }
+    }
+
+    pub fn is_truthy(&mut self) -> bool {
+        match self {
+            Object::Nil => false,
+            Object::Boolean(x) => *x,
+            _ => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeError {
+    pub token: Option<Token>,
+    pub message: String,
+}
+
+impl RuntimeError {
+    pub fn new(token: &Token, message: &str) -> Self {
+        Self {
+            token: Some(token.to_owned()),
+            message: message.to_owned(),
+        }
+    }
+    pub fn with_message(message: &str) -> Self {
+        Self {
+            token: None,
+            message: message.to_owned(),
+        }
+    }
+}
+
+impl fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(token) = &self.token {
+            write!(f, "token: {:?} error:\"{:?}\"", token, self.message)
+        } else {
+            write!(f, "error:\"{}\"", self.message)
+        }
+    }
+}
+
+pub enum InterpretResultStatus {
+    // Returned when a runtime error occurs
+    Error(RuntimeError),
+
+    // Returned when control is flowing up the stack from a brack statement to the innermost loop.
+    Break,
+
+    // Return statement in a function, carrying optional return value payload.
+    Return(Option<Object>),
+}
+
+impl Visitor<Result<Object>> for Interpreter {
+    fn visit_binary_expression(
+        &mut self,
+        expr: &Expr,
+        left: &Box<Expr>,
+        operator: &Token,
+        right: &Box<Expr>,
+    ) -> Result<Object> {
+        let mut left = self.evaluate(left)?;
+        let mut right = self.evaluate(right)?;
+
+        match operator.of_type {
+            TokenType::MINUS => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Number(left - right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+            TokenType::STAR => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Number(left * right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            TokenType::PLUS => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Number(left + right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            TokenType::SLASH => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Number(left / right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+            TokenType::GREATER => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Boolean(left > right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            TokenType::LESS => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Boolean(left < right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+            TokenType::LESS_EQUAL => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Boolean(left <= right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            TokenType::GREATER_EQUAL => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Boolean(left >= right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            TokenType::EQUAL_EQUAL => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Boolean(left == right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            TokenType::BANG_EQUAL => {
+                if let Object::Number(left) = left {
+                    if let Object::Number(right) = right {
+                        Ok(Object::Boolean(left != right))
+                    } else {
+                        todo!()
+                    }
+                } else {
+                    todo!()
+                }
+            }
+
+            _ => unreachable!(),
+        }
+    }
+
+    fn visit_group_expression(
+        &mut self,
+        expr: &Expr,
+        content: &Box<Expr>,
+    ) -> Result<Object> {
+        self.evaluate(content)
+    }
+
+    fn visit_literal_expression(
+        &mut self,
+        expr: &Expr,
+        literal: &Literal,
+    ) -> Result<Object> {
+        return Ok(Object::from_literal(literal));
+    }
+
+    fn visit_unary_expression(
+        &mut self,
+        _expr: &Expr,
+        operator: &Token,
+        right: &Box<Expr>,
+    ) -> Result<Object> {
+        let mut right = self.evaluate(right)?;
+
+        match operator.of_type {
+            TokenType::MINUS => match right {
+                Object::Number(n) => Ok(Object::Number(-n)),
+                _ => unimplemented!(),
+            },
+            TokenType::BANG => Ok(Object::Boolean(!right.is_truthy())),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Interpreter {
+    pub fn evaluate(&mut self, expr: &Box<Expr>) -> Result<Object> {
+        match self._evaluate(expr) {
+            Ok(result) => Ok(result),
+            Err(e) => unimplemented!(),
+        }
+    }
+
+    fn _evaluate(&mut self, expr: &Box<Expr>) -> Result<Object> {
+        expr.accept(self)
+    }
+}
+
+///
+///expression     → equality ;
+///equality       → comparison ( ( "!=" | "==" ) comparison )* ;
+///comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
+///addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
+///multiplication → unary ( ( "/" | "*" ) unary )* ;
+///unary          → ( "!" | "-" ) unary
+///               | primary ;
+///primary        → NUMBER | STRING | "false" | "true" | "nil"
+///               | "(" expression ")" ;
+///
+
+impl Parser {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self {
+            tokens: tokens,
+            current: 0,
+        }
+    }
+
+    pub fn expression(&mut self) -> Result<Box<Expr>>{
+        self.equality()
+    }
+
+    pub fn parse(&mut self) -> Result<Box<Expr>>{
+        self.expression()
+    }
+
+    ///
+    ///equality → comparison ( ( "!=" | "==" ) comparison )* ;
+    ///
+    pub fn equality(&mut self) -> Result<Box<Expr>>{
+        let mut expr = self.comparison()?;
+
+        while self.if_match(&vec![TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
+            let operator = self.previous().clone();
+            let right = self.comparison()?;
+
+            expr = Box::new(Expr::Binary {
+                left: expr,
+                operator,
+                right: right,
+            });
+        }
+        Ok(expr)
+    }
+
+    pub fn if_match(&mut self, token_types: &[TokenType]) -> bool {
+        for token in token_types {
+            if self.check(token) {
+                self.advance();
+                return true;
+            }
+        }
+        false
+    }
+
+    // Returns the current token we have yet to consume.
+    pub fn peek(&self) -> &Token {
+        self.tokens.get(self.current).unwrap()
+    }
+
+    // Checks if we run out of tokens to parse.
+    pub fn is_at_end(&self) -> bool {
+        self.peek().of_type == TokenType::EOF
+    }
+    pub fn check(&self, of_type: &TokenType) -> bool {
+        if self.is_at_end() {
+            return true;
+        }
+        &self.peek().of_type == of_type
+    }
+
+    pub fn advance(&mut self) -> &Token {
+        if !self.is_at_end() {
+            self.current += 1
+        }
+
+        self.previous()
+    }
+
+    //Last consumed token.
+    pub fn previous(&self) -> &Token {
+        self.tokens.get(self.current - 1).expect("AAAAAAAAAAAA")
+    }
+    pub fn comparison(&mut self) -> Result<Box<Expr>>{
+        let mut expr = self.addition()?;
+
+        while self.if_match(&[
+            TokenType::GREATER,
+            TokenType::GREATER_EQUAL,
+            TokenType::LESS,
+            TokenType::LESS_EQUAL,
+        ]) {
+            let operator = self.previous().clone();
+            let right = self.addition()?;
+
+            expr = Box::new(Expr::Binary {
+                right: expr,
+                operator,
+                left: right,
+            });
+        }
+        Ok(expr)
+    }
+
+    /// unary -> ("!" | "-") unary
+    ///          | primary ;
+    /// If the current token is rather
+    /// a band or minux sign, then we are in the precense
+    /// of an unary expresion.
+    ///
+    /// the operator is consumed in the first call to unary()
+    /// then we grab the token and recursively call unary() to
+    /// parse the operand. Finally, wrap that all up in an unary
+    /// expression syntax tree.
+    pub fn unary(&mut self) -> Result<Box<Expr>> {
+        if self.if_match(&vec![TokenType::BANG, TokenType::MINUS]) {
+            let operator: Token = self.previous().clone();
+            let right = self.unary()?;
+
+            return Ok(Box::new(Expr::Unary {
+                operator,
+                right: right,
+            }));
+        }
+        /// a primary expression is reached.
+        /// where
+        /// primary → NUMBER | STRING | "false" | "true" | "nil"
+        ///         | "(" expression ")" ;
+        self.primary()
+    }
+
+    pub fn primary(&mut self) -> Result<Box<Expr>>{
+        if self.if_match(&vec![TokenType::FALSE]) {
+            return Ok(Box::new(Expr::Literal {
+                literal: Literal::Boolean(false),
+            }));
+        }
+        if self.if_match(&vec![TokenType::TRUE]) {
+            return Ok(Box::new(Expr::Literal {
+                literal: Literal::Boolean(true),
+            }));
+        }
+        if self.if_match(&vec![TokenType::NIL]) {
+            return Ok(Box::new(Expr::Literal {
+                literal: Literal::None,
+            }));
+        }
+        if self.if_match(&vec![TokenType::NUMBER, TokenType::STRING]) {
+            return Ok(Box::new(Expr::Literal {
+                literal: self.previous().literal.clone().unwrap(),
+            }));
+        }
+        if self.if_match(&vec![TokenType::LEFT_PAREN]) {
+            let expr = self.expression();
+
+            self.consume(TokenType::RIGHT_PAREN, String::from("Expected ')'"));
+            return Ok(Box::new(Expr::Grouping { expression: expr? }));
+        } else {
+            unimplemented!() //Err(ParseError::SyntaxError(self.peek(), String::from("Expected expression")))
+        }
+    }
+
+    pub fn consume(&mut self, token_type: TokenType, message: String) -> Result<&Token> {
+        if self.check(&token_type) {
+            Ok(self.advance())
+        } else {
+            Err(
+                String::from("Error"), //ParseError::SyntaxError(self.peek().clone(), message)
+            )
+        }
+    }
+
+    pub fn multiplication(&mut self) -> Result<Box<Expr>>{
+        let mut expr = self.unary()?;
+
+        while self.if_match(&vec![TokenType::SLASH, TokenType::STAR]) {
+            let operator = self.previous().clone();
+            let right = self.unary()?;
+
+            expr = Box::new(Expr::Binary {
+                left:expr, 
+                operator,
+                right: right,
+            });
+        }
+
+        Ok(expr)
+    }
+
+    pub fn synchronize(&mut self) -> () {
+        self.advance();
+
+        while !self.is_at_end() {
+            if self.previous().of_type == TokenType::SEMICOLON {
+                return;
+            }
+        }
+
+        match self.peek().of_type {
+            TokenType::CLASS => {}
+            TokenType::FUN => {}
+            TokenType::VAR => {}
+            TokenType::FOR => {}
+            TokenType::IF => {}
+            TokenType::WHILE => {}
+            TokenType::PRINT => {}
+            TokenType::RETURN => {}
+            _ => (),
+        }
+
+        self.advance();
+    }
+
+    pub fn addition(&mut self) -> Result<Box<Expr>>{
+        let mut expr = self.multiplication()?;
+
+        while self.if_match(&vec![TokenType::PLUS, TokenType::MINUS]) {
+            let operator = self.previous().clone();
+            let right = self.multiplication()?;
+
+            expr = Box::new(Expr::Binary {
+                left: expr,
+                operator,
+                right: right,
+            });
+        }
+        Ok(expr)
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum Expr {
+    Binary {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>,
+    },
+
+    Grouping {
+        expression: Box<Expr>,
+    },
+
+    Literal {
+        literal: Literal,
+    },
+
+    Unary {
+        operator: Token,
+        right: Box<Expr>,
+    },
+}
+
+pub trait Visitor<Q> {
+        fn visit_binary_expression(
+        &mut self,
+        expr: &Expr,
+        left: &Box<Expr>,
+        operator: &Token,
+        right: &Box<Expr>,
+    ) -> Q;
+
+    fn visit_group_expression(&mut self, expr: &Expr, content: &Box<Expr>) -> Q;
+
+    fn visit_literal_expression(&mut self, expr: &Expr, literal: &Literal) -> Q;
+
+    fn visit_unary_expression(&mut self, expr: &Expr, operator: &Token, right: &Box<Expr>) -> Q;
+}
+
+struct AstPrinter;
+
+impl AstPrinter {
+    fn new() -> Self {
+        AstPrinter {}
+    }
+    fn print(&mut self, expr: &Vec<Box<Expr>>) -> String {
+        let mut builder = String::new();
+
+        for expression in expr {
+            builder.push_str(expression.accept(self).as_str());
+        }
+
+        builder
+    }
+
+    fn parenthesize(&mut self, name: &str, expr: &Vec<&Box<Expr>>) -> String {
+        let mut builder = String::from("(");
+
+        builder.push_str(name);
+
+        for expression in expr {
+            builder.push_str(" ");
+            builder.push_str(expression.accept(self).as_str());
+        }
+
+        builder.push_str(")");
+
+        builder
+    }
+}
+
+impl Visitor<String> for AstPrinter {
+    fn visit_binary_expression(
+        &mut self,
+        expr: &Expr,
+        left: &Box<Expr>,
+        operator: &Token,
+        right: &Box<Expr>,
+    ) -> String {
+        self.parenthesize(&operator.lexeme, &vec![left, right])
+    }
+
+    fn visit_group_expression(&mut self, expr: &Expr, content: &Box<Expr>) -> String {
+        self.parenthesize("Group", &vec![content])
+    }
+
+    fn visit_literal_expression(&mut self, expr: &Expr, literal: &Literal) -> String {
+        literal.to_string()
+    }
+
+    fn visit_unary_expression(
+        &mut self,
+        _expr: &Expr,
+        operator: &Token,
+        right: &Box<Expr>,
+    ) -> String {
+        self.parenthesize(&operator.lexeme, &vec![right])
+    }
+}
+
+impl Expr {
+    fn accept<T, R>(&self, expr: &mut T) -> R
+    where
+        T: Visitor<R>,
+    {
+        match self {
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => expr.visit_binary_expression(&self, &left, &operator, &right),
+
+            Expr::Grouping { expression } => expr.visit_group_expression(&self, &expression),
+            Expr::Literal { literal } => expr.visit_literal_expression(&self, &literal),
+            _ => unreachable!(),
+        }
+    }
+}
 
 fn run_file(file: &String) {
     let bytes = fs::read_to_string(file).expect("Error reading external file.");
@@ -47,7 +666,7 @@ impl Scanner {
     }
 
     pub fn add_token(&mut self, of_type: TokenType, literal: Option<Literal>) {
-        self.add_token_val(of_type, None)
+        self.add_token_val(of_type, literal)
     }
 
     pub fn add_token_val(&mut self, of_type: TokenType, literal: Option<Literal>) {
@@ -181,7 +800,7 @@ impl Scanner {
     }
 
     pub fn is_digit(&mut self, c: char) -> bool {
-        return c >= '0' && c <= '9';
+        c >= '0' && c <= '9'
     }
 
     pub fn number(&mut self) {
@@ -200,13 +819,16 @@ impl Scanner {
         }
 
         let lexeme = self.source[self.start..self.current]
+            .trim()
             .chars()
             .collect::<String>();
+
         // Parses the lexeme to an i32 type.
         //
         // TODO: f32 as well as f64 support.
+
         let parsed_lexeme = lexeme.parse::<i32>().expect("Unexpected parsing behaviour");
-        self.add_token(TokenType::NUMBER, Some(Literal::Number(parsed_lexeme)))
+        self.add_token(TokenType::NUMBER, Some(Literal::Number(parsed_lexeme)));
     }
 
     pub fn peek_next(&mut self) -> char {
@@ -280,10 +902,14 @@ fn run_prompt() {
     }
 }
 
-fn run(source: &String) -> Result<(), String> {
+fn run(source: &String) -> Result<()> {
     let mut input = "(+);".to_string();
-    let mut scanner = Scanner::new(input);
+    let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
+
+    let mut parser = Parser::new(tokens.to_vec());
+
+    let mut expression = parser.expression();
 
     for token in tokens {
         println!("{:?}", token);
@@ -432,5 +1058,26 @@ mod tests {
                 }
             )
         )
+    }
+
+    #[test]
+    fn evaluation_test() {
+        let input = vec![
+            ("1+2+3", Object::Number(7)),
+        ];
+
+        for (expression, expected_result) in input {
+            let mut scanner = Scanner::new(expression.to_string());
+            let tokens = scanner.scan_tokens();
+
+            let mut parser = Parser::new(tokens.to_vec());
+
+            let expr = parser.parse().unwrap();
+
+            let mut interpreter = Interpreter{};
+            let result = interpreter.evaluate(&expr).unwrap();
+
+            assert_eq!(result, expected_result);
+        }
     }
 }

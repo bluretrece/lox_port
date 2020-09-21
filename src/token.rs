@@ -1,7 +1,8 @@
 use super::literal::*;
 use super::token_type::*;
 use std::fmt;
-#[derive(Eq, PartialEq, PartialOrd)]
+
+#[derive(Eq, Clone,PartialEq, PartialOrd)]
 pub struct Token {
     pub of_type: TokenType,
     pub lexeme: String,
