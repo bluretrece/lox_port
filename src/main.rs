@@ -1,19 +1,25 @@
+use std::cmp::{Ordering, PartialOrd};
 use std::fmt;
 pub mod literal;
+pub mod scanner;
 pub mod token;
 pub mod token_type;
-
+// Not necesary.
+use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 use literal::*;
-use token::*;
-use token_type::*;
-pub type Result<T> = std::result::Result<T, String>;
+use scanner::*;
 use std::{
     fs,
     io::{self, Write},
 };
+use token::*;
+use token_type::*;
 
 /// TODO
 /// Improve error handling.
+///
+///
+/// MORE TESTS
 ///
 /// Modify the run function so it now can succesfully handle a parser as well as its
 /// error handling function.
@@ -30,12 +36,11 @@ struct Parser {
 
 struct Interpreter;
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq)]
 pub enum Object {
     Boolean(bool),
     Number(i32),
     Str(String),
-    Undefined,
     Nil,
 }
 
@@ -45,7 +50,7 @@ impl Object {
             Literal::String(x) => Object::Str(x.clone()),
             Literal::Number(x) => Object::Number(*x),
             Literal::Boolean(x) => Object::Boolean(*x),
-            _ => Object::Undefined,
+            Literal::None => Object::Nil,
         }
     }
 
@@ -58,194 +63,38 @@ impl Object {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct RuntimeError {
-    pub token: Option<Token>,
-    pub message: String,
-}
-
-impl RuntimeError {
-    pub fn new(token: &Token, message: &str) -> Self {
-        Self {
-            token: Some(token.to_owned()),
-            message: message.to_owned(),
-        }
-    }
-    pub fn with_message(message: &str) -> Self {
-        Self {
-            token: None,
-            message: message.to_owned(),
-        }
-    }
-}
-
-impl fmt::Display for RuntimeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if let Some(token) = &self.token {
-            write!(f, "token: {:?} error:\"{:?}\"", token, self.message)
-        } else {
-            write!(f, "error:\"{}\"", self.message)
-        }
-    }
-}
-
-pub enum InterpretResultStatus {
-    // Returned when a runtime error occurs
-    Error(RuntimeError),
-
-    // Returned when control is flowing up the stack from a brack statement to the innermost loop.
-    Break,
-
-    // Return statement in a function, carrying optional return value payload.
-    Return(Option<Object>),
-}
-
-impl Visitor<Result<Object>> for Interpreter {
+impl Visitor for Interpreter {
+    type Value = Object;
     fn visit_binary_expression(
         &mut self,
         expr: &Expr,
         left: &Box<Expr>,
         operator: &Token,
         right: &Box<Expr>,
-    ) -> Result<Object> {
+    ) -> Result<Self::Value, LoxError> {
         let mut left = self.evaluate(left)?;
         let mut right = self.evaluate(right)?;
 
         match operator.of_type {
-            TokenType::MINUS => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Number(left - right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-            TokenType::STAR => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Number(left * right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            TokenType::PLUS => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Number(left + right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            TokenType::SLASH => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Number(left / right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-            TokenType::GREATER => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Boolean(left > right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            TokenType::LESS => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Boolean(left < right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-            TokenType::LESS_EQUAL => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Boolean(left <= right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            TokenType::GREATER_EQUAL => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Boolean(left >= right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            TokenType::EQUAL_EQUAL => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Boolean(left == right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            TokenType::BANG_EQUAL => {
-                if let Object::Number(left) = left {
-                    if let Object::Number(right) = right {
-                        Ok(Object::Boolean(left != right))
-                    } else {
-                        todo!()
-                    }
-                } else {
-                    todo!()
-                }
-            }
-
-            _ => unreachable!(),
+            TokenType::MINUS => Ok(left - right),
+            TokenType::SLASH => Ok(left / right),
+            TokenType::STAR => Ok(left * right),
+            TokenType::PLUS => left + right,
+            TokenType::GREATER => Ok(Object::Boolean(left > right)),
+            TokenType::GREATER_EQUAL => Ok(Object::Boolean(left >= right)),
+            TokenType::LESS => Ok(Object::Boolean(left < right)),
+            TokenType::LESS_EQUAL => Ok(Object::Boolean(left <= right)),
+            TokenType::EQUAL_EQUAL => Ok(Object::Boolean(left == right)),
+            TokenType::BANG_EQUAL => Ok(Object::Boolean(left != right)),
+            _ => unreachable!()
         }
     }
 
-    fn visit_group_expression(
-        &mut self,
-        expr: &Expr,
-        content: &Box<Expr>,
-    ) -> Result<Object> {
+    fn visit_group_expression(&mut self, expr: &Expr, content: &Box<Expr>) -> Result<Self::Value, LoxError> {
         self.evaluate(content)
     }
 
-    fn visit_literal_expression(
-        &mut self,
-        expr: &Expr,
-        literal: &Literal,
-    ) -> Result<Object> {
+    fn visit_literal_expression(&mut self, expr: &Expr, literal: &Literal) -> Result<Self::Value, LoxError> {
         return Ok(Object::from_literal(literal));
     }
 
@@ -254,7 +103,7 @@ impl Visitor<Result<Object>> for Interpreter {
         _expr: &Expr,
         operator: &Token,
         right: &Box<Expr>,
-    ) -> Result<Object> {
+    ) -> Result<Self::Value, LoxError> {
         let mut right = self.evaluate(right)?;
 
         match operator.of_type {
@@ -268,18 +117,99 @@ impl Visitor<Result<Object>> for Interpreter {
     }
 }
 
-impl Interpreter {
-    pub fn evaluate(&mut self, expr: &Box<Expr>) -> Result<Object> {
-        match self._evaluate(expr) {
-            Ok(result) => Ok(result),
-            Err(e) => unimplemented!(),
+impl Add for Object {
+    type Output = Result<Object, LoxError>;
+
+    fn add(self, rhs: Object) -> Result<Object, LoxError> {
+        match self {
+            Object::Number(value) => match rhs {
+                Object::Number(rhs_value) => Ok(Object::Number(value + rhs_value)),
+                _ => Err(LoxError::RuntimeError(
+                    "right hand side must also be a number".to_string(),
+                )),
+            },
+            Object::Str(value) => match rhs {
+                Object::Str(rhs_value) => {
+                    let mut new_str = value.clone();
+                    new_str.push_str(&rhs_value);
+                    Ok(Object::Str(new_str))
+                }
+                _ => panic!("TypeError: Can't add a string to a number."),
+            },
+            Object::Boolean(_value) => Err(LoxError::RuntimeError(
+                "Cannot add value to boolean.".to_string(),
+            )),
+            Object::Nil => Err(LoxError::RuntimeError(
+                "Cannot add value to nil.".to_string(),
+            )),
         }
     }
+}
 
-    fn _evaluate(&mut self, expr: &Box<Expr>) -> Result<Object> {
+impl Mul for Object{
+    type Output = Object;
+
+    fn mul(self, rhs: Object) -> Object {
+        match self {
+            Object::Number(value) => match rhs {
+                Object::Number(rhs_value) => Object::Number(value * rhs_value),
+                _ => panic!("Can't multiply these two values"),
+            },
+            _ => panic!("Can't multiply these two values"),
+        }
+    }
+}
+
+impl PartialOrd for Object {
+    fn partial_cmp(&self, other: &Object) -> Option<Ordering> {
+        match self {
+            Object::Nil => match other {
+                Object::Nil => Some(Ordering::Equal),
+                _ => Some(Ordering::Greater),
+            },
+            Object::Number(value) => match other {
+                Object::Number(other_value) => value.partial_cmp(other_value),
+                _ => panic!("Can't compare a number with this value"),
+            },
+            _ => panic!("Can't compare these two types"),
+        }
+    }
+}
+
+impl Div for Object {
+    type Output = Object;
+
+    fn div(self, rhs: Object) -> Object {
+        match self {
+            Object::Number(value) => match rhs {
+                Object::Number(rhs_value) => Object::Number(value / rhs_value),
+                _ => panic!("Can't divide these two values"),
+            },
+            _ => panic!("Can't divide these two values"),
+        }
+    }
+}
+
+
+impl Sub for Object{
+    type Output = Object;
+
+    fn sub(self, rhs: Object) -> Object {
+        match self {
+            Object::Number(value) => match rhs {
+                Object::Number(rhs_value) => Object::Number(value - rhs_value),
+                _ => panic!("Can't subtract these two values"),
+            },
+            _ => panic!("Can't subtract these two values"),
+        }
+    }
+}
+impl Interpreter {
+    pub fn evaluate(&mut self, expr: &Box<Expr>) -> Result<Object, LoxError> {
         expr.accept(self)
     }
 }
+
 
 ///
 ///expression     → equality ;
@@ -301,18 +231,18 @@ impl Parser {
         }
     }
 
-    pub fn expression(&mut self) -> Result<Box<Expr>>{
+    pub fn expression(&mut self) -> Result<Box<Expr>, LoxError> {
         self.equality()
     }
 
-    pub fn parse(&mut self) -> Result<Box<Expr>>{
+    pub fn parse(&mut self) -> Result<Box<Expr>, LoxError> {
         self.expression()
     }
 
     ///
     ///equality → comparison ( ( "!=" | "==" ) comparison )* ;
     ///
-    pub fn equality(&mut self) -> Result<Box<Expr>>{
+    pub fn equality(&mut self) -> Result<Box<Expr>, LoxError> {
         let mut expr = self.comparison()?;
 
         while self.if_match(&vec![TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {
@@ -349,12 +279,12 @@ impl Parser {
     }
     pub fn check(&self, of_type: &TokenType) -> bool {
         if self.is_at_end() {
-            return true;
+            return false;
         }
         &self.peek().of_type == of_type
     }
 
-    pub fn advance(&mut self) -> &Token {
+    pub fn advance(&mut self) -> Token {
         if !self.is_at_end() {
             self.current += 1
         }
@@ -363,10 +293,10 @@ impl Parser {
     }
 
     //Last consumed token.
-    pub fn previous(&self) -> &Token {
-        self.tokens.get(self.current - 1).expect("AAAAAAAAAAAA")
+    pub fn previous(&self) -> Token {
+        self.tokens[self.current -1].clone()
     }
-    pub fn comparison(&mut self) -> Result<Box<Expr>>{
+    pub fn comparison(&mut self) -> Result<Box<Expr>, LoxError> {
         let mut expr = self.addition()?;
 
         while self.if_match(&[
@@ -397,9 +327,9 @@ impl Parser {
     /// then we grab the token and recursively call unary() to
     /// parse the operand. Finally, wrap that all up in an unary
     /// expression syntax tree.
-    pub fn unary(&mut self) -> Result<Box<Expr>> {
+    pub fn unary(&mut self) -> Result<Box<Expr>, LoxError> {
         if self.if_match(&vec![TokenType::BANG, TokenType::MINUS]) {
-            let operator: Token = self.previous().clone();
+            let operator = self.previous().clone();
             let right = self.unary()?;
 
             return Ok(Box::new(Expr::Unary {
@@ -414,7 +344,7 @@ impl Parser {
         self.primary()
     }
 
-    pub fn primary(&mut self) -> Result<Box<Expr>>{
+    pub fn primary(&mut self) -> Result<Box<Expr>, LoxError> {
         if self.if_match(&vec![TokenType::FALSE]) {
             return Ok(Box::new(Expr::Literal {
                 literal: Literal::Boolean(false),
@@ -441,21 +371,21 @@ impl Parser {
             self.consume(TokenType::RIGHT_PAREN, String::from("Expected ')'"));
             return Ok(Box::new(Expr::Grouping { expression: expr? }));
         } else {
-            unimplemented!() //Err(ParseError::SyntaxError(self.peek(), String::from("Expected expression")))
+            Err(LoxError::RuntimeError(String::from("A"))) //Err(ParseError::SyntaxError(self.peek(), String::from("Expected expression")))
         }
     }
 
-    pub fn consume(&mut self, token_type: TokenType, message: String) -> Result<&Token> {
+    pub fn consume(&mut self, token_type: TokenType, message: String) -> Result<Token, LoxError> {
         if self.check(&token_type) {
             Ok(self.advance())
         } else {
             Err(
-                String::from("Error"), //ParseError::SyntaxError(self.peek().clone(), message)
+                LoxError::RuntimeError(String::from("Error")), //ParseError::SyntaxError(self.peek().clone(), message)
             )
         }
     }
 
-    pub fn multiplication(&mut self) -> Result<Box<Expr>>{
+    pub fn multiplication(&mut self) -> Result<Box<Expr>, LoxError> {
         let mut expr = self.unary()?;
 
         while self.if_match(&vec![TokenType::SLASH, TokenType::STAR]) {
@@ -463,7 +393,7 @@ impl Parser {
             let right = self.unary()?;
 
             expr = Box::new(Expr::Binary {
-                left:expr, 
+                left: expr,
                 operator,
                 right: right,
             });
@@ -472,7 +402,7 @@ impl Parser {
         Ok(expr)
     }
 
-    pub fn synchronize(&mut self) -> () {
+    pub fn synchronize(&mut self) {
         self.advance();
 
         while !self.is_at_end() {
@@ -496,7 +426,7 @@ impl Parser {
         self.advance();
     }
 
-    pub fn addition(&mut self) -> Result<Box<Expr>>{
+    pub fn addition(&mut self) -> Result<Box<Expr>, LoxError> {
         let mut expr = self.multiplication()?;
 
         while self.if_match(&vec![TokenType::PLUS, TokenType::MINUS]) {
@@ -535,92 +465,65 @@ pub enum Expr {
     },
 }
 
-pub trait Visitor<Q> {
-        fn visit_binary_expression(
-        &mut self,
-        expr: &Expr,
-        left: &Box<Expr>,
-        operator: &Token,
-        right: &Box<Expr>,
-    ) -> Q;
-
-    fn visit_group_expression(&mut self, expr: &Expr, content: &Box<Expr>) -> Q;
-
-    fn visit_literal_expression(&mut self, expr: &Expr, literal: &Literal) -> Q;
-
-    fn visit_unary_expression(&mut self, expr: &Expr, operator: &Token, right: &Box<Expr>) -> Q;
+#[derive(Debug)]
+pub enum LoxError {
+    RuntimeError(String),
+    BindingError(String, String),
 }
 
-struct AstPrinter;
-
-impl AstPrinter {
-    fn new() -> Self {
-        AstPrinter {}
-    }
-    fn print(&mut self, expr: &Vec<Box<Expr>>) -> String {
-        let mut builder = String::new();
-
-        for expression in expr {
-            builder.push_str(expression.accept(self).as_str());
+impl std::fmt::Display for LoxError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LoxError::RuntimeError(message) => write!(f, "RuntimeError: {}", message),
+            LoxError::BindingError(token, message) => {
+                write!(f, "BindingError for {}: {}", token, message)
+            }
         }
-
-        builder
-    }
-
-    fn parenthesize(&mut self, name: &str, expr: &Vec<&Box<Expr>>) -> String {
-        let mut builder = String::from("(");
-
-        builder.push_str(name);
-
-        for expression in expr {
-            builder.push_str(" ");
-            builder.push_str(expression.accept(self).as_str());
-        }
-
-        builder.push_str(")");
-
-        builder
     }
 }
 
-impl Visitor<String> for AstPrinter {
+pub trait Visitor {
+    type Value;
+
     fn visit_binary_expression(
         &mut self,
         expr: &Expr,
         left: &Box<Expr>,
         operator: &Token,
         right: &Box<Expr>,
-    ) -> String {
-        self.parenthesize(&operator.lexeme, &vec![left, right])
-    }
+    ) -> Result<Self::Value, LoxError>;
 
-    fn visit_group_expression(&mut self, expr: &Expr, content: &Box<Expr>) -> String {
-        self.parenthesize("Group", &vec![content])
-    }
+    fn visit_group_expression(
+        &mut self,
+        expr: &Expr,
+        content: &Box<Expr>,
+    ) -> Result<Self::Value, LoxError>;
 
-    fn visit_literal_expression(&mut self, expr: &Expr, literal: &Literal) -> String {
-        literal.to_string()
-    }
+    fn visit_literal_expression(
+        &mut self,
+        expr: &Expr,
+        literal: &Literal,
+    ) -> Result<Self::Value, LoxError>;
 
     fn visit_unary_expression(
         &mut self,
-        _expr: &Expr,
+        expr: &Expr,
         operator: &Token,
         right: &Box<Expr>,
-    ) -> String {
-        self.parenthesize(&operator.lexeme, &vec![right])
-    }
+    ) -> Result<Self::Value, LoxError>;
 }
 
-impl Expr {
-    fn accept<T, R>(&self, expr: &mut T) -> R
-    where
-        T: Visitor<R>,
-    {
+pub trait Visitable {
+    fn accept(&self, visitor: &mut Visitor<Value = Object>) -> Result<Object, LoxError>;
+}
+
+
+impl Visitable for Expr {
+    fn accept(&self, expr: &mut Visitor<Value=Object>) -> Result<Object, LoxError> {
         match self {
             Expr::Binary {
                 left,
-                operator,
+               operator,
                 right,
             } => expr.visit_binary_expression(&self, &left, &operator, &right),
 
@@ -637,257 +540,6 @@ fn run_file(file: &String) {
     run(&bytes);
 }
 
-pub struct Scanner {
-    pub source: String,
-    pub tokens: Vec<Token>,
-    pub start: usize,
-    pub current: usize,
-    pub line: usize,
-}
-
-impl Scanner {
-    pub fn new(source: String) -> Self {
-        Self {
-            source: source,
-            tokens: Vec::new(),
-            start: 0,
-            current: 0,
-            line: 1,
-        }
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
-    }
-
-    pub fn advance(&mut self) -> char {
-        self.current += 1;
-        self.source.chars().nth(self.current - 1).unwrap()
-    }
-
-    pub fn add_token(&mut self, of_type: TokenType, literal: Option<Literal>) {
-        self.add_token_val(of_type, literal)
-    }
-
-    pub fn add_token_val(&mut self, of_type: TokenType, literal: Option<Literal>) {
-        let text = &self.source[self.start..self.current];
-
-        self.tokens
-            .push(Token::new(of_type, text.to_string(), literal, self.line))
-    }
-
-    pub fn advance_if_then(&mut self, next: char) -> bool {
-        if self.is_at_end() {
-            return false;
-        } else if self.source.chars().nth(self.current).unwrap() != next {
-            return false;
-        } else {
-            self.current += 1;
-            true
-        }
-    }
-    pub fn scan_token(&mut self) {
-        let c = self.advance();
-
-        match c {
-            '(' => self.add_token(TokenType::LEFT_PAREN, None),
-            ')' => self.add_token(TokenType::RIGHT_PAREN, None),
-            '{' => self.add_token(TokenType::LEFT_BRACE, None),
-            '}' => self.add_token(TokenType::RIGHT_BRACE, None),
-            ',' => self.add_token(TokenType::COMMA, None),
-            '.' => self.add_token(TokenType::DOT, None),
-            '-' => self.add_token(TokenType::MINUS, None),
-            '+' => self.add_token(TokenType::PLUS, None),
-            ';' => self.add_token(TokenType::SEMICOLON, None),
-            '*' => self.add_token(TokenType::STAR, None),
-            'o' => {
-                if self.advance_if_then('r') {
-                    self.add_token(TokenType::OR, None)
-                }
-            }
-            '!' => {
-                if self.advance_if_then('=') {
-                    self.add_token(TokenType::BANG_EQUAL, None)
-                }
-            }
-            '=' => {
-                if self.advance_if_then('=') {
-                    self.add_token(TokenType::EQUAL_EQUAL, None)
-                }
-            }
-            '<' => {
-                if self.advance_if_then('=') {
-                    self.add_token(TokenType::LESS_EQUAL, None)
-                }
-            }
-            '>' => {
-                if self.advance_if_then('=') {
-                    self.add_token(TokenType::GREATER_EQUAL, None)
-                }
-            }
-            '/' => {
-                if self.advance_if_then('/') {
-                    while self.peek() != '\n' && !self.is_at_end() {
-                        self.advance();
-                    }
-                } else {
-                    self.add_token(TokenType::SLASH, None);
-                }
-            }
-            ' ' | '\r' | '\t' => (),
-            '\n' => self.line += 1,
-            '"' => {
-                self.string();
-            }
-            _ => {
-                if self.is_digit(c) {
-                    self.number();
-                } else if self.is_apha(c) {
-                    self.identifier()
-                } else {
-                    print!("Unexpected character.")
-                }
-            }
-        }
-    }
-
-    pub fn identifier(&mut self) {
-        let peek_character = self.peek();
-        while self.is_alphanumeric(peek_character) {
-            self.advance();
-        }
-
-        let mut text = self.source[self.start..self.current].trim();
-
-        if let Some(token_Type) = self.match_identifier(text.to_string()) {
-            // Keyword match.
-            self.add_token(token_Type, None)
-        } else {
-            // User defined identifier.
-            self.add_token(TokenType::IDENTIFIER, None)
-        }
-    }
-
-    // Returns Some(TokenType) if any of the identifiers matches.
-    pub fn match_identifier(&mut self, c: String) -> Option<TokenType> {
-        match c.as_str() {
-            "else" => Some(TokenType::ELSE),
-            "and" => Some(TokenType::AND),
-            "class" => Some(TokenType::CLASS),
-            "false" => Some(TokenType::FALSE),
-            "for" => Some(TokenType::FOR),
-            "fun" => Some(TokenType::FUN),
-            "if" => Some(TokenType::IF),
-            "nil" => Some(TokenType::NIL),
-            "or" => Some(TokenType::OR),
-            "print" => Some(TokenType::PRINT),
-            "return" => Some(TokenType::RETURN),
-            "super" => Some(TokenType::SUPER),
-            "this" => Some(TokenType::THIS),
-            "true" => Some(TokenType::TRUE),
-            "var" => Some(TokenType::VAR),
-            "while" => Some(TokenType::WHILE),
-            _ => None,
-        }
-    }
-
-    pub fn is_apha(&mut self, c: char) -> bool {
-        c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
-    }
-
-    pub fn is_alphanumeric(&mut self, c: char) -> bool {
-        self.is_apha(c) || self.is_digit(c)
-    }
-
-    pub fn is_digit(&mut self, c: char) -> bool {
-        c >= '0' && c <= '9'
-    }
-
-    pub fn number(&mut self) {
-        let peek = self.peek();
-        while self.is_digit(peek) {
-            self.advance();
-        }
-
-        let peek_next = self.peek_next();
-        if self.peek() == '.' && self.is_digit(peek_next) {
-            self.advance();
-
-            while self.is_digit(peek) {
-                self.advance();
-            }
-        }
-
-        let lexeme = self.source[self.start..self.current]
-            .trim()
-            .chars()
-            .collect::<String>();
-
-        // Parses the lexeme to an i32 type.
-        //
-        // TODO: f32 as well as f64 support.
-
-        let parsed_lexeme = lexeme.parse::<i32>().expect("Unexpected parsing behaviour");
-        self.add_token(TokenType::NUMBER, Some(Literal::Number(parsed_lexeme)));
-    }
-
-    pub fn peek_next(&mut self) -> char {
-        if self.current + 1 >= self.source.len() {
-            let character = '\0';
-            return character;
-        } else {
-            self.source.chars().nth(self.current + 1).unwrap()
-        }
-    }
-
-    pub fn string(&mut self) {
-        while self.peek() != '"' && !self.is_at_end() {
-            if self.peek() != '\n' {
-                self.line += 1;
-            }
-            self.advance();
-        }
-
-        if self.is_at_end() {
-            print!("Error handling");
-        }
-
-        self.advance();
-
-        let value = self.source[self.start + 1..self.current - 1]
-            .chars()
-            .collect::<String>();
-        self.add_token(TokenType::STRING, Some(Literal::String(value)));
-    }
-
-    // advance()-like function, but doesn't consumes the character.
-    // returns a reference to the next character.
-    pub fn peek(&self) -> char {
-        if self.is_at_end() {
-            return '\0';
-        } else {
-            self.source.chars().nth(self.current).unwrap()
-        }
-    }
-
-    pub fn scan_tokens(&mut self) -> &Vec<Token> {
-        while !self.is_at_end() {
-            self.start = self.current;
-            self.scan_token();
-        }
-
-        self.tokens
-            .push(Token::new(TokenType::EOF, "".to_string(), None, self.line));
-
-        &self.tokens
-    }
-
-    // Test purposes. Returns the current token.
-    pub fn tokens_helper(self) -> Vec<Token> {
-        self.tokens
-    }
-}
-
 fn run_prompt() {
     let buffer = io::stdin();
     let mut stdout = io::stdout();
@@ -902,7 +554,7 @@ fn run_prompt() {
     }
 }
 
-fn run(source: &String) -> Result<()> {
+fn run(source: &String) -> Result<(), String> {
     let mut input = "(+);".to_string();
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
@@ -1062,9 +714,7 @@ mod tests {
 
     #[test]
     fn evaluation_test() {
-        let input = vec![
-            ("1+2+3", Object::Number(7)),
-        ];
+        let input = vec![("3-1", Object::Number(2))];
 
         for (expression, expected_result) in input {
             let mut scanner = Scanner::new(expression.to_string());
@@ -1074,7 +724,7 @@ mod tests {
 
             let expr = parser.parse().unwrap();
 
-            let mut interpreter = Interpreter{};
+            let mut interpreter = Interpreter {};
             let result = interpreter.evaluate(&expr).unwrap();
 
             assert_eq!(result, expected_result);
