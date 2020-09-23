@@ -23,7 +23,6 @@ use token_type::*;
 ///
 /// Modify the run function so it now can succesfully handle a parser as well as its
 /// error handling function.
-
 pub enum ParseError {
     SyntaxError(Token, String),
 }
@@ -715,6 +714,60 @@ mod tests {
     #[test]
     fn evaluation_test() {
         let input = vec![("3-1", Object::Number(2))];
+
+        for (expression, expected_result) in input {
+            let mut scanner = Scanner::new(expression.to_string());
+            let tokens = scanner.scan_tokens();
+
+            let mut parser = Parser::new(tokens.to_vec());
+
+            let expr = parser.parse().unwrap();
+
+            let mut interpreter = Interpreter {};
+            let result = interpreter.evaluate(&expr).unwrap();
+
+            assert_eq!(result, expected_result);
+        }
+    }
+    #[test]
+    fn evaluation_test_2() {
+        let input = vec![("6+6*2", Object::Number(18))];
+
+        for (expression, expected_result) in input {
+            let mut scanner = Scanner::new(expression.to_string());
+            let tokens = scanner.scan_tokens();
+
+            let mut parser = Parser::new(tokens.to_vec());
+
+            let expr = parser.parse().unwrap();
+
+            let mut interpreter = Interpreter {};
+            let result = interpreter.evaluate(&expr).unwrap();
+
+            assert_eq!(result, expected_result);
+        }
+    }
+    #[test]
+    fn boolean_evaluation_test_() {
+        let input = vec![("1==1", Object::Boolean(true))];
+
+        for (expression, expected_result) in input {
+            let mut scanner = Scanner::new(expression.to_string());
+            let tokens = scanner.scan_tokens();
+
+            let mut parser = Parser::new(tokens.to_vec());
+
+            let expr = parser.parse().unwrap();
+
+            let mut interpreter = Interpreter {};
+            let result = interpreter.evaluate(&expr).unwrap();
+
+            assert_eq!(result, expected_result);
+        }
+    }
+    #[test]
+    fn boolean_evaluation_test_2() {
+        let input = vec![("3==2", Object::Boolean(false))];
 
         for (expression, expected_result) in input {
             let mut scanner = Scanner::new(expression.to_string());
