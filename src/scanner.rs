@@ -1,9 +1,33 @@
 use super::token::*;
 use super::literal::*;
 use super::token_type::*;
+use std::ops::Index;
+use lazy_static::*;
+use std::collections::HashMap;
+lazy_static! {
+    static ref KEYWORDS: HashMap<&'static str, TokenType> = {
+        let mut keywords = HashMap::new();
+        keywords.insert("and", TokenType::AND);
+        keywords.insert("class", TokenType::CLASS);
+        keywords.insert("else", TokenType::ELSE);
+        keywords.insert("false", TokenType::FALSE);
+        keywords.insert("for", TokenType::FOR);
+        keywords.insert("fun", TokenType::FUN);
+        keywords.insert("if", TokenType::IF);
+        keywords.insert("nil", TokenType::NIL);
+        keywords.insert("or", TokenType::OR);
+        keywords.insert("print", TokenType::PRINT);
+        keywords.insert("return", TokenType::RETURN);
+        keywords.insert("super", TokenType::SUPER);
+        keywords.insert("this", TokenType::THIS);
+        keywords.insert("true", TokenType::TRUE);
+        keywords.insert("var", TokenType::VAR);
+        keywords.insert("while", TokenType::WHILE);
+        keywords
+    };
+}
 
-
-pub(crate) struct Scanner {
+pub struct Scanner {
     pub source: String,
     pub tokens: Vec<Token>,
     pub start: usize,
@@ -124,10 +148,10 @@ impl Scanner {
         }
 
         let mut text = self.source[self.start..self.current].trim();
-
-        if let Some(token_Type) = self.match_identifier(text.to_string()) {
+        
+        if let Some(token_Type) = KEYWORDS.get(&text) {
             // Keyword match.
-            self.add_token(token_Type, None)
+            self.add_token(*token_Type, None)
         } else {
             // User defined identifier.
             self.add_token(TokenType::IDENTIFIER, None)
@@ -235,7 +259,7 @@ impl Scanner {
             self.source.chars().nth(self.current).unwrap()
         }
     }
-
+    
     pub fn scan_tokens(&mut self) -> &Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;

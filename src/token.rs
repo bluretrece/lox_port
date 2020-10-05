@@ -25,4 +25,8 @@ impl Token {
             line,
         }
     }
+
+    pub fn lexeme(&self) -> String {
+        return self.lexeme.clone()
+    }
 }
