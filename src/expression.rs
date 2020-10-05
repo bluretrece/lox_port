@@ -6,6 +6,11 @@ use crate::lox_error::*;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expr {
+    Logical {
+        left: Box<Expr>,
+        operator: Token,
+        right: Box<Expr>
+    },
     Binary {
         left: Box<Expr>,
         operator: Token,
@@ -39,6 +44,12 @@ pub trait ExprVisitor {
         &mut self,
         expr: &Box<Expr>,
         name: &Token
+    ) -> Result<Self::Value, LoxError>;
+    fn visit_logical_expression(
+        &mut self,
+        left: &Box<Expr>,
+        operator: &Token,
+        right: &Box<Expr>,
     ) -> Result<Self::Value, LoxError>;
 
     fn visit_binary_expression(

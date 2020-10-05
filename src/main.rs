@@ -1,28 +1,26 @@
+pub mod environment;
+pub mod expression;
 pub mod interpreter;
-pub mod parser;
 pub mod literal;
+pub mod lox_error;
+pub mod object;
+pub mod parser;
 pub mod scanner;
+pub mod statement;
 pub mod token;
 pub mod token_type;
-pub mod lox_error;
-pub mod expression;
-pub mod statement;
-pub mod object;
-pub mod environment;
 
-
+use crate::parser::*;
 use literal::*;
+use parser::*;
 use scanner::*;
+use std::fmt;
 use std::{
     fs,
     io::{self, Write},
 };
-use std::fmt;
 use token::*;
 use token_type::*;
-use parser::*;
-use crate::parser::*;
-
 ///
 ///expression     → equality ;
 ///equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -77,10 +75,38 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::object::*;
-    use crate::interpreter::*;
-    use crate::scanner;
     use super::*;
+    use crate::environment::*;
+    use crate::interpreter::*;
+    use crate::lox_error::*;
+    use crate::object::*;
+    use crate::scanner;
+    use crate::statement::*;
+    #[test]
+    fn define_test() {
+        let mut env = Environment::new();
+
+        let definitions = vec![
+            (
+                Token::new(TokenType::IDENTIFIER, String::from("a"), None, 1),
+                Object::Number(10),
+            ),
+            (
+                Token::new(TokenType::IDENTIFIER, String::from("b"), None, 1),
+                Object::Str(String::from("Hello world")),
+            ),
+            (
+                Token::new(TokenType::IDENTIFIER, String::from("c"), None, 1),
+                Object::Boolean(false),
+            ),
+        ];
+
+        for (name, value) in definitions {
+            env.define(&name.lexeme, &value);
+            assert_eq!(env.get(name), value);
+        }
+    }
+
     #[test]
     fn scanner_test() {
         let mut input = "(+);".to_string();
@@ -189,37 +215,9 @@ mod tests {
             )
         );
     }
-
-    #[test]
-    fn basic_number_test() {
-        let input = "1".to_string();
-        let mut scanner = Scanner::new(input);
-
-        scanner.scan_tokens();
-
-        assert_eq!(
-            scanner.tokens_helper(),
-            vec!(
-                Token {
-                    of_type: TokenType::NUMBER,
-                    literal: Some(Literal::Number(1)),
-                    lexeme: String::from("1"),
-                    line: 1
-                },
-                Token {
-                    of_type: TokenType::EOF,
-                    literal: None,
-                    lexeme: String::from(""),
-                    line: 1,
-                }
-            )
-        )
-    }
-
     #[test]
     fn evaluation_test() {
-
-        let input = vec![("3-1", Object::Number(2))];
+        let input = vec![("1+2*3", Object::Number(7))];
 
         for (expression, expected_result) in input {
             let mut scanner = Scanner::new(expression.to_string());
@@ -227,66 +225,32 @@ mod tests {
 
             let mut parser = Parser::new(tokens.to_vec());
 
-            let expr = parser.parse().unwrap();
+            let expr = parser.parse_expression().unwrap();
 
-            let mut interpreter = Interpreter {};
+            let mut interpreter = Interpreter::new();
             let result = interpreter.evaluate(&expr).unwrap();
 
             assert_eq!(result, expected_result);
         }
     }
+
     #[test]
-    fn evaluation_test_2() {
-        let input = vec![("6+6*2", Object::Number(18))];
+    fn expected_keywords_test() {
+        let mut scanner = Scanner::new(
+            "and for if while".to_string(),
+        );
 
-        for (expression, expected_result) in input {
-            let mut scanner = Scanner::new(expression.to_string());
-            let tokens = scanner.scan_tokens();
+        let tokens = scanner.scan_tokens();
+        let token_types: Vec<TokenType> = tokens.into_iter().map(|t| t.of_type).collect();
 
-            let mut parser = Parser::new(tokens.to_vec());
-
-            let expr = parser.parse().unwrap();
-
-            let mut interpreter = Interpreter {};
-            let result = interpreter.evaluate(&expr).unwrap();
-
-            assert_eq!(result, expected_result);
-        }
-    }
-    #[test]
-    fn boolean_evaluation_test_() {
-        let input = vec![("1==1", Object::Boolean(true))];
-
-        for (expression, expected_result) in input {
-            let mut scanner = Scanner::new(expression.to_string());
-            let tokens = scanner.scan_tokens();
-
-            let mut parser = Parser::new(tokens.to_vec());
-
-            let expr = parser.parse().unwrap();
-
-            let mut interpreter = Interpreter {};
-            let result = interpreter.evaluate(&expr).unwrap();
-
-            assert_eq!(result, expected_result);
-        }
-    }
-    #[test]
-    fn boolean_evaluation_test_2() {
-        let input = vec![("3==2", Object::Boolean(false))];
-
-        for (expression, expected_result) in input {
-            let mut scanner = Scanner::new(expression.to_string());
-            let tokens = scanner.scan_tokens();
-
-            let mut parser = Parser::new(tokens.to_vec());
-
-            let expr = parser.parse().unwrap();
-
-            let mut interpreter = Interpreter {};
-            let result = interpreter.evaluate(&expr).unwrap();
-
-            assert_eq!(result, expected_result);
-        }
+        assert_eq!(
+            token_types,
+            vec![
+                TokenType::AND,
+                TokenType::FOR,
+                TokenType::IF,
+                TokenType::WHILE
+            ]
+        );
     }
 }

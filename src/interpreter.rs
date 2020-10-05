@@ -8,8 +8,8 @@ use crate::statement::Visitable as VisitableStatement;
 use crate::statement::*;
 use crate::token::*;
 use crate::token_type::*;
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub struct Interpreter {
     pub environment: Rc<RefCell<Environment>>,
@@ -17,17 +17,52 @@ pub struct Interpreter {
 
 impl StmtVisitor for Interpreter {
     type Value = Object;
+    fn visit_while_statement(
+        &mut self,
+        _stmt: &Statement,
+        condition: &Box<Expr>,
+        body: &Box<Statement>
+    ) -> Option<Object>{
+        let condition = self.evaluate(condition).unwrap();
+        let is_truthy = self.is_truthy(condition);
+        while is_truthy == Object::Boolean(true) {
+            self.execute(body);
+        }
+
+        return Some(Object::Nil);
+    }
     fn visit_block_statement(
         &mut self,
         _stmt: &Statement,
-        statements: &Vec<Box<Statement>>
+        statements: &Vec<Box<Statement>>,
     ) -> Option<Object> {
         let env_ref = Rc::clone(&self.environment);
 
         self.execute_block(
             statements,
-            Rc::new(RefCell::new(Environment::with_ref(env_ref))));
+            Rc::new(RefCell::new(Environment::with_ref(env_ref))),
+        );
         None
+    }
+    fn visit_if_statement(
+        &mut self,
+        stmt: &Statement,
+        condition: &Box<Expr>,
+        then_branch: &Box<Statement>,
+        else_branch: &Option<Box<Statement>>,
+    ) -> Option<Object> {
+        let condition = self.evaluate(condition).unwrap();
+        let is_truthy = self.is_truthy(condition);
+
+        match is_truthy {
+            Object::Boolean(true) => self.execute(then_branch),
+            _ => {
+                if !else_branch.is_none() {
+                    self.execute(&else_branch.clone().unwrap());
+                }
+                None
+        }
+        }
     }
     fn visit_expression_stmt(
         &mut self,
@@ -57,7 +92,7 @@ impl StmtVisitor for Interpreter {
                 value = initializer;
             }
         }
-        self.environment.borrow_mut().define(&name.lexeme, value);
+        self.environment.borrow_mut().define(&name.lexeme, &value);
         None
     }
 }
@@ -65,13 +100,37 @@ impl StmtVisitor for Interpreter {
 impl ExprVisitor for Interpreter {
     type Value = Object;
 
-    fn visit_assign_expression(&mut self,
-        expr: &Box<Expr>, name: &Token) -> Result<Self::Value, LoxError> {
+    fn visit_logical_expression(
+        &mut self,
+        left: &Box<Expr>,
+        operator: &Token,
+        right: &Box<Expr>,
+    ) -> Result<Self::Value, LoxError> {
+        let mut left_expr = self.evaluate(left).unwrap();
+        let is_truthy: Object = self.is_truthy(left_expr.clone());
+
+        if operator.of_type == TokenType::OR {
+            match is_truthy {
+                Object::Boolean(true) => Ok(left_expr),
+                _ => self.evaluate(right)
+            }
+        } else {
+            match is_truthy {
+                Object::Boolean(false) => Ok(left_expr),
+                _ => self.evaluate(right),
+            }
+        }
+    }
+    fn visit_assign_expression(
+        &mut self,
+        expr: &Box<Expr>,
+        name: &Token,
+    ) -> Result<Self::Value, LoxError> {
         let mut value = self.evaluate(expr)?;
 
         self.environment.borrow_mut().assign(name, value.clone());
 
-        return Ok(value)
+        return Ok(value);
     }
     fn visit_variable_expression(&mut self, name: &Token) -> Result<Self::Value, LoxError> {
         Ok(self.environment.borrow_mut().get(name.clone()))
@@ -137,18 +196,30 @@ impl ExprVisitor for Interpreter {
 }
 
 impl Interpreter {
+    pub fn new() -> Self {
+        Interpreter {
+            environment: Rc::new(RefCell::new(Environment::new())),
+        }
+    }
     pub fn evaluate(&mut self, expr: &Box<Expr>) -> Result<Object, LoxError> {
         expr.accept(self)
     }
 
     pub fn interpret(&mut self, stmt: &Vec<Box<Statement>>) {
         for statement in stmt {
-            self.execute(statement)
+            self.execute(statement);
         }
     }
-
-    pub fn execute(&mut self, stmt: &Box<Statement>) {
-        stmt.accept(self);
+    pub fn is_truthy(&mut self, result: Object) -> Object {
+        match result {
+            Object::Nil => Object::Boolean(false),
+            Object::Number(_) => Object::Boolean(true),
+            Object::Str(_) => Object::Boolean(true),
+            Object::Boolean(value) => Object::Boolean(value),
+        }
+    }
+    pub fn execute(&mut self, stmt: &Box<Statement>) -> Option<Object> {
+        stmt.accept(self)
     }
     pub fn execute_block(&mut self, stmt: &Vec<Box<Statement>>, env: Rc<RefCell<Environment>>) {
         let mut previous = Rc::clone(&self.environment);
@@ -159,6 +230,5 @@ impl Interpreter {
         }
 
         self.environment = previous;
-
     }
 }

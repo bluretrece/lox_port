@@ -26,8 +26,8 @@ impl Environment {
         }
     }
 
-    pub fn define(&mut self, name: &str, value: Object) {
-        self.values.insert(name.to_string(), value);
+    pub fn define(&mut self, name: &str, value: &Object) {
+        self.values.insert(name.to_string(), value.clone());
     }
     
     pub fn assign(&mut self, name: &Token, value: Object) {
