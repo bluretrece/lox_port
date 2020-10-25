@@ -126,13 +126,13 @@ impl Parser {
         );
 
         return Ok(Box::new(Statement::Variable {
-            name: name,
-            initializer: initializer,
+            name,
+            initializer,
         }));
     }
 
     pub fn print_statement(&mut self) -> Result<Box<Statement>, LoxError> {
-        let mut value = self.expression()?;
+        let value = self.expression()?;
 
         self.consume(
             TokenType::SEMICOLON,
@@ -153,8 +153,8 @@ impl Parser {
 
         return Ok(Box::new(
                 Statement::While {
-                    condition: condition,
-                    body: body
+                    condition,
+                    body
                 }
         ))
     }
@@ -200,15 +200,15 @@ impl Parser {
 
         if let Some(condition) = condition {
             body = Box::new(Statement::While {
-                condition: condition,
-                body: body,
+                condition,
+                body,
             });
         } else {
             body = Box::new(Statement::While {
                 condition: Box::new(Expr::Literal{
                     literal: Literal::Boolean(true),
                 }),
-                body: body,
+                body,
             });
         }
 

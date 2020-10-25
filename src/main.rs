@@ -15,6 +15,7 @@ use literal::*;
 use parser::*;
 use scanner::*;
 use std::fmt;
+
 use std::{
     fs,
     io::{self, Write},
@@ -236,9 +237,7 @@ mod tests {
 
     #[test]
     fn expected_keywords_test() {
-        let mut scanner = Scanner::new(
-            "and for if while".to_string(),
-        );
+        let mut scanner = Scanner::new("and for if while".to_string());
 
         let tokens = scanner.scan_tokens();
         let token_types: Vec<TokenType> = tokens.into_iter().map(|t| t.of_type).collect();
@@ -249,7 +248,8 @@ mod tests {
                 TokenType::AND,
                 TokenType::FOR,
                 TokenType::IF,
-                TokenType::WHILE
+                TokenType::WHILE,
+                TokenType::EOF
             ]
         );
     }

@@ -1,31 +1,7 @@
 use super::token::*;
 use super::literal::*;
 use super::token_type::*;
-use std::ops::Index;
-use lazy_static::*;
-use std::collections::HashMap;
-lazy_static! {
-    static ref KEYWORDS: HashMap<&'static str, TokenType> = {
-        let mut keywords = HashMap::new();
-        keywords.insert("and", TokenType::AND);
-        keywords.insert("class", TokenType::CLASS);
-        keywords.insert("else", TokenType::ELSE);
-        keywords.insert("false", TokenType::FALSE);
-        keywords.insert("for", TokenType::FOR);
-        keywords.insert("fun", TokenType::FUN);
-        keywords.insert("if", TokenType::IF);
-        keywords.insert("nil", TokenType::NIL);
-        keywords.insert("or", TokenType::OR);
-        keywords.insert("print", TokenType::PRINT);
-        keywords.insert("return", TokenType::RETURN);
-        keywords.insert("super", TokenType::SUPER);
-        keywords.insert("this", TokenType::THIS);
-        keywords.insert("true", TokenType::TRUE);
-        keywords.insert("var", TokenType::VAR);
-        keywords.insert("while", TokenType::WHILE);
-        keywords
-    };
-}
+
 
 pub struct Scanner {
     pub source: String,
@@ -38,7 +14,7 @@ pub struct Scanner {
 impl Scanner {
     pub fn new(source: String) -> Self {
         Self {
-            source: source,
+            source,
             tokens: Vec::new(),
             start: 0,
             current: 0,
@@ -142,16 +118,15 @@ impl Scanner {
     }
 
     pub fn identifier(&mut self) {
-        let peek_character = self.peek();
-        while self.is_alphanumeric(peek_character) {
+        while self.is_alphanumeric(self.peek()) {
             self.advance();
         }
 
-        let mut text = self.source[self.start..self.current].trim();
+        let text = self.source[self.start..self.current].trim();
         
-        if let Some(token_Type) = KEYWORDS.get(&text) {
+        if let Some(token_type) = self.match_identifier(text.to_string()) {
             // Keyword match.
-            self.add_token(*token_Type, None)
+            self.add_token(token_type, None)
         } else {
             // User defined identifier.
             self.add_token(TokenType::IDENTIFIER, None)
@@ -194,8 +169,7 @@ impl Scanner {
     }
 
     pub fn number(&mut self) {
-        let peek = self.peek();
-        while self.is_digit(peek) {
+        while self.is_digit(self.peek()) {
             self.advance();
         }
 
@@ -203,7 +177,7 @@ impl Scanner {
         if self.peek() == '.' && self.is_digit(peek_next) {
             self.advance();
 
-            while self.is_digit(peek) {
+            while self.is_digit(self.peek()) {
                 self.advance();
             }
         }
