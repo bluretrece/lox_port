@@ -46,7 +46,7 @@ impl StmtVisitor for Interpreter {
     }
     fn visit_if_statement(
         &mut self,
-        stmt: &Statement,
+        _stmt: &Statement,
         condition: &Box<Expr>,
         then_branch: &Box<Statement>,
         else_branch: &Option<Box<Statement>>,
@@ -106,7 +106,7 @@ impl ExprVisitor for Interpreter {
         operator: &Token,
         right: &Box<Expr>,
     ) -> Result<Self::Value, LoxError> {
-        let mut left_expr = self.evaluate(left).unwrap();
+        let left_expr = self.evaluate(left).unwrap();
         let is_truthy: Object = self.is_truthy(left_expr.clone());
 
         if operator.of_type == TokenType::OR {
@@ -126,7 +126,7 @@ impl ExprVisitor for Interpreter {
         expr: &Box<Expr>,
         name: &Token,
     ) -> Result<Self::Value, LoxError> {
-        let mut value = self.evaluate(expr)?;
+        let value = self.evaluate(expr)?;
 
         self.environment.borrow_mut().assign(name, value.clone());
 
@@ -137,13 +137,13 @@ impl ExprVisitor for Interpreter {
     }
     fn visit_binary_expression(
         &mut self,
-        expr: &Expr,
+        _expr: &Expr,
         left: &Box<Expr>,
         operator: &Token,
         right: &Box<Expr>,
     ) -> Result<Self::Value, LoxError> {
-        let mut left = self.evaluate(left)?;
-        let mut right = self.evaluate(right)?;
+        let left = self.evaluate(left)?;
+        let right = self.evaluate(right)?;
 
         match operator.of_type {
             TokenType::MINUS => Ok(left - right),
@@ -162,7 +162,7 @@ impl ExprVisitor for Interpreter {
 
     fn visit_group_expression(
         &mut self,
-        expr: &Expr,
+        _expr: &Expr,
         content: &Box<Expr>,
     ) -> Result<Self::Value, LoxError> {
         self.evaluate(content)
@@ -170,7 +170,7 @@ impl ExprVisitor for Interpreter {
 
     fn visit_literal_expression(
         &mut self,
-        expr: &Expr,
+        _expr: &Expr,
         literal: &Literal,
     ) -> Result<Self::Value, LoxError> {
         return Ok(Object::from_literal(literal));
@@ -222,7 +222,7 @@ impl Interpreter {
         stmt.accept(self)
     }
     pub fn execute_block(&mut self, stmt: &Vec<Box<Statement>>, env: Rc<RefCell<Environment>>) {
-        let mut previous = Rc::clone(&self.environment);
+        let previous = Rc::clone(&self.environment);
         self.environment = env;
 
         for statement in stmt {

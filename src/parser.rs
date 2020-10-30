@@ -1,7 +1,6 @@
 use crate::expression::*;
 use crate::literal::*;
 use crate::lox_error::*;
-use crate::object::*;
 use crate::statement::*;
 use crate::token::*;
 use crate::token_type::*;
@@ -14,23 +13,20 @@ pub struct Parser {
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
-        Self {
-            tokens: tokens,
-            current: 0,
-        }
+        Self { tokens, current: 0 }
     }
-    
+
     pub fn or(&mut self) -> Result<Box<Expr>, LoxError> {
         let mut expr = self.and()?;
 
         while self.if_match(&[TokenType::OR]) {
-            let mut operator = self.previous();
-            let mut right = self.and()?;
-            let mut expr = Expr::Logical {
+            let operator = self.previous();
+            let right = self.and()?;
+            expr = Box::new(Expr::Logical {
                 left: expr.clone(),
-                operator: operator,
-                right: right,
-            };
+                operator,
+                right,
+            });
         }
 
         Ok(expr)
@@ -44,32 +40,28 @@ impl Parser {
         let mut expr = self.equality()?;
 
         while self.if_match(&[TokenType::AND]) {
-            let mut operator = self.previous();
-            let mut right = self.equality()?;
-            let mut expr = Expr::Logical {
+            let operator = self.previous();
+            let right = self.equality()?;
+                expr = Box::new(Expr::Logical {
                 left: expr.clone(),
-                operator: operator,
-                right: right,
-            };
+                operator,
+                right,
+            });
         }
-        
+
         Ok(expr)
     }
 
     pub fn assignment(&mut self) -> Result<Box<Expr>, LoxError> {
-        let mut expr = self.or()?;
-        // let mut expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.if_match(&[TokenType::EQUAL]) {
-            let mut equals = self.previous();
-            let mut value = self.assignment()?;
+            let _equals = self.previous();
+            let value = self.assignment()?;
 
             match *expr {
                 Expr::Variable { name } => {
-                    return Ok(Box::new(Expr::Assign {
-                        name: name,
-                        value: value,
-                    }));
+                    return Ok(Box::new(Expr::Assign { name, value }));
                 }
                 _ => {
                     return Err(LoxError::RuntimeError(String::from(
@@ -83,7 +75,6 @@ impl Parser {
     }
     pub fn expression(&mut self) -> Result<Box<Expr>, LoxError> {
         self.assignment()
-        //self.equality()
     }
 
     pub fn parse_statement(&mut self) -> Result<Vec<Box<Statement>>, LoxError> {
@@ -123,12 +114,9 @@ impl Parser {
         self.consume(
             TokenType::SEMICOLON,
             String::from("Expect ';' after variable declaration"),
-        );
+        )?;
 
-        return Ok(Box::new(Statement::Variable {
-            name,
-            initializer,
-        }));
+        return Ok(Box::new(Statement::Variable { name, initializer }));
     }
 
     pub fn print_statement(&mut self) -> Result<Box<Statement>, LoxError> {
@@ -137,29 +125,30 @@ impl Parser {
         self.consume(
             TokenType::SEMICOLON,
             String::from("Expect ';' after value."),
-        );
+        )?;
 
         return Ok(Box::new(Statement::Print { expression: value }));
     }
 
     pub fn while_statement(&mut self) -> Result<Box<Statement>, LoxError> {
-        self.consume(TokenType::LEFT_PAREN, String::from("Expect ( after while statement"));
+        self.consume(
+            TokenType::LEFT_PAREN,
+            String::from("Expect ( after while statement"),
+        )?;
 
         let condition = self.expression()?;
 
-        self.consume(TokenType::RIGHT_PAREN, String::from("Expect ) after while statement"));
+        self.consume(
+            TokenType::RIGHT_PAREN,
+            String::from("Expect ) after while statement"),
+        )?;
 
         let body = self.statement()?;
 
-        return Ok(Box::new(
-                Statement::While {
-                    condition,
-                    body
-                }
-        ))
+        return Ok(Box::new(Statement::While { condition, body }));
     }
     pub fn for_statement(&mut self) -> Result<Box<Statement>, LoxError> {
-        self.consume(TokenType::LEFT_PAREN, String::from("Expect ( for ."));
+        self.consume(TokenType::LEFT_PAREN, String::from("Expect ( for ."))?;
 
         let initializer = if self.if_match(&[TokenType::SEMICOLON]) {
             None
@@ -168,14 +157,14 @@ impl Parser {
         } else {
             Some(self.expression_statement()?)
         };
-        
+
         let condition = if !self.if_match(&[TokenType::SEMICOLON]) {
             Some(self.expression()?)
         } else {
             None
         };
 
-        self.consume(TokenType::SEMICOLON, String::from("Expec ; after loop"));
+        self.consume(TokenType::SEMICOLON, String::from("Expec ; after loop"))?;
 
         let increment = if self.if_match(&[TokenType::RIGHT_PAREN]) {
             Some(self.expression()?)
@@ -183,29 +172,29 @@ impl Parser {
             None
         };
 
-        self.consume(TokenType::RIGHT_PAREN, String::from("Expect ) after for clauses."));
+        self.consume(
+            TokenType::RIGHT_PAREN,
+            String::from("Expect ) after for clauses."),
+        )?;
 
         let mut body = self.statement()?;
 
         if let Some(increment) = increment {
             body = Box::new(Statement::Block {
-                statements: vec![body, 
-                Box::new(Statement::Expression 
-                    {
-                        expression: increment 
-                    })
-                ]
+                statements: vec![
+                    body,
+                    Box::new(Statement::Expression {
+                        expression: increment,
+                    }),
+                ],
             })
         }
 
         if let Some(condition) = condition {
-            body = Box::new(Statement::While {
-                condition,
-                body,
-            });
+            body = Box::new(Statement::While { condition, body });
         } else {
             body = Box::new(Statement::While {
-                condition: Box::new(Expr::Literal{
+                condition: Box::new(Expr::Literal {
                     literal: Literal::Boolean(true),
                 }),
                 body,
@@ -213,11 +202,9 @@ impl Parser {
         }
 
         if let Some(initializer) = initializer {
-            body = Box::new(
-                Statement::Block {
-                    statements: vec![initializer, body],
-                }
-            );
+            body = Box::new(Statement::Block {
+                statements: vec![initializer, body],
+            });
         }
         Ok(body)
     }
@@ -225,7 +212,7 @@ impl Parser {
         if self.if_match(&[TokenType::IF]) {
             return self.if_statement();
         }
-        
+
         if self.if_match(&[TokenType::FOR]) {
             return self.for_statement();
         }
@@ -247,20 +234,20 @@ impl Parser {
         self.consume(
             TokenType::LEFT_PAREN,
             String::from("Expect '(' after 'if' keyword."),
-        );
+        )?;
 
-        let mut condition = self.expression()?;
+        let condition = self.expression()?;
 
         self.consume(
             TokenType::RIGHT_PAREN,
             String::from("Expect ')' after 'if' condition."),
-        );
+        )?;
 
         let then_branch = self.statement()?;
 
-        let mut else_branch = if self.if_match(&[TokenType::ELSE]) {
+        let else_branch = if self.if_match(&[TokenType::ELSE]) {
             Some(self.statement()?)
-        } else { 
+        } else {
             None
         };
 
@@ -286,12 +273,12 @@ impl Parser {
     }
 
     pub fn expression_statement(&mut self) -> Result<Box<Statement>, LoxError> {
-        let mut expr = self.expression()?;
+        let expr = self.expression()?;
 
         self.consume(
             TokenType::SEMICOLON,
             String::from("Expect ';' after expression"),
-        );
+        )?;
 
         return Ok(Box::new(Statement::Expression { expression: expr }));
     }
@@ -303,7 +290,7 @@ impl Parser {
             statements.push(self.declaration()?);
         }
 
-        return Ok(statements)
+        return Ok(statements);
     }
 
     ///
@@ -319,7 +306,7 @@ impl Parser {
             expr = Box::new(Expr::Binary {
                 left: expr,
                 operator,
-                right: right,
+                right,
             });
         }
         Ok(expr)
@@ -398,10 +385,7 @@ impl Parser {
             let operator = self.previous().clone();
             let right = self.unary()?;
 
-            return Ok(Box::new(Expr::Unary {
-                operator,
-                right: right,
-            }));
+            return Ok(Box::new(Expr::Unary { operator, right }));
         }
         /// a primary expression is reached.
         /// where
@@ -427,9 +411,18 @@ impl Parser {
             }));
         }
         if self.if_match(&vec![TokenType::NUMBER, TokenType::STRING]) {
-            return Ok(Box::new(Expr::Literal {
-                literal: self.previous().literal.clone().unwrap(),
-            }));
+            if let Some(l) = self.previous().clone().literal {
+                return Ok(
+                    Box::new(
+                        Expr::Literal {
+                            literal: l
+                        }
+                    )
+                )
+            }
+            //return Ok(Box::new(Expr::Literal {
+            //    literal: self.previous().literal.clone().unwrap(),
+            //}));
         }
 
         if self.if_match(&vec![TokenType::IDENTIFIER]) {
@@ -441,11 +434,11 @@ impl Parser {
         if self.if_match(&vec![TokenType::LEFT_PAREN]) {
             let expr = self.expression();
 
-            self.consume(TokenType::RIGHT_PAREN, String::from("Expected ')'"));
+            self.consume(TokenType::RIGHT_PAREN, String::from("Expected ')'"))?;
             return Ok(Box::new(Expr::Grouping { expression: expr? }));
-        } else {
-            Err(LoxError::RuntimeError(String::from("A"))) //Err(ParseError::SyntaxError(self.peek(), String::from("Expected expression")))
         }
+
+        Err(LoxError::RuntimeError(String::from("Expected expression.")))
     }
 
     pub fn consume(&mut self, token_type: TokenType, message: String) -> Result<Token, LoxError> {
@@ -453,7 +446,7 @@ impl Parser {
             Ok(self.advance())
         } else {
             Err(
-                LoxError::RuntimeError(String::from("Error")), //ParseError::SyntaxError(self.peek().clone(), message)
+                LoxError::RuntimeError(message)
             )
         }
     }
@@ -468,7 +461,7 @@ impl Parser {
             expr = Box::new(Expr::Binary {
                 left: expr,
                 operator,
-                right: right,
+                right,
             });
         }
 
@@ -509,7 +502,7 @@ impl Parser {
             expr = Box::new(Expr::Binary {
                 left: expr,
                 operator,
-                right: right,
+                right,
             });
         }
         Ok(expr)

@@ -21,7 +21,7 @@ impl Token {
         Self {
             of_type,
             lexeme,
-            literal: literal,
+            literal,
             line,
         }
     }

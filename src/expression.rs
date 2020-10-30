@@ -1,8 +1,25 @@
-use crate::expression;
 use crate::object::*;
 use crate::token::*;
 use crate::literal::*;
 use crate::lox_error::*;
+use std::any::{Any, TypeId};
+
+pub trait InstanceOf
+where 
+    Self: Any,
+{
+    fn instance_of<U: ?Sized + Any>(&self) -> bool {
+        TypeId::of::<Self>() == TypeId::of::<U>()
+    }
+}
+
+impl InstanceOf for Expr{}
+
+impl Expr {
+    pub fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expr {
@@ -86,12 +103,12 @@ pub trait ExprVisitor {
 }
 
 pub trait Visitable {
-    fn accept(&self, visitor: &mut ExprVisitor<Value = Object>) -> Result<Object, LoxError>;
+    fn accept(&self, visitor: &mut dyn ExprVisitor<Value = Object>) -> Result<Object, LoxError>;
 }
 
 
 impl Visitable for Expr {
-    fn accept(&self, expr: &mut ExprVisitor<Value=Object>) -> Result<Object, LoxError> {
+    fn accept(&self, expr: &mut dyn ExprVisitor<Value=Object>) -> Result<Object, LoxError> {
         match self {
             Expr::Binary {
                 left,
@@ -101,7 +118,10 @@ impl Visitable for Expr {
 
             Expr::Grouping { expression } => expr.visit_group_expression(&self, &expression),
             Expr::Literal { literal } => expr.visit_literal_expression(&self, &literal),
-            _ => unreachable!(),
+            Expr::Logical {left, operator, right} => expr.visit_logical_expression(&right, &operator, &left),
+            Expr::Assign {value, name } => expr.visit_assign_expression(&value, &name),
+            Expr::Unary {operator, right } => expr.visit_unary_expression(&self, &operator, &right),
+            Expr::Variable { name } => expr.visit_variable_expression(&name),
         }
     }
 }

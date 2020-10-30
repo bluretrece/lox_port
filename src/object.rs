@@ -1,6 +1,6 @@
 use std::ops::{Add, Div, Mul, Neg, Not, Sub};
 use std::cmp::{Ordering, PartialOrd};
-
+use std::fmt;
 use crate::literal::*;
 use crate::lox_error::*;
 
@@ -11,6 +11,17 @@ pub enum Object {
     Number(i32),
     Str(String),
     Nil,
+}
+
+impl fmt::Display for Object {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Boolean(b) => write!(f, "{}", b),
+            Self::Number(x) => write!(f, "{}", x),
+            Self::Str(s) => write!(f, "{}", s),
+            Self::Nil=> write!(f,"Nil"),
+        }
+    }
 }
 
 impl PartialOrd for Object {
@@ -25,6 +36,31 @@ impl PartialOrd for Object {
                 _ => panic!("Can't compare a number with this value"),
             },
             _ => panic!("Can't compare these two types"),
+        }
+    }
+}
+
+
+impl Neg for Object {
+    type Output = Result<Object, String>;
+    fn neg(self) -> Result<Object, String> {
+        match self {
+            Object::Nil => Ok(Object::Boolean(true)),
+            Object::Number(x) => Ok(Object::Number(-x)),
+            Object::Boolean(_) => Err(String::from("Operation not supported")),
+            Object::Str(_) => Err(String::from("Operation not supported"))
+        }
+    }
+}
+
+impl Not for Object {
+    type Output = Object;
+
+    fn not(self) -> Object {
+        match self {
+            Object::Boolean(b) => Object::Boolean(!b),
+            Object::Nil => Object::Boolean(true),
+            _ => Object::Boolean(false)
         }
     }
 }

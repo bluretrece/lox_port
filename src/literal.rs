@@ -3,7 +3,6 @@ use std::fmt;
 pub enum Literal {
     String(String),
     Number(i32),
-    //FloatNumber(f32),
     None,
     Boolean(bool)
 }
@@ -14,7 +13,7 @@ impl fmt::Display for Literal {
             Self::String(s) => write!(f, "{}", s),
             Self::None => write!(f, "nil"),
             Self::Number(n) => {
-                let mut x = n.to_string();
+                let x = n.to_string();
                 write!(f, "{}", x)
             },
             Self::Boolean(x) => {

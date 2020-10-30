@@ -9,19 +9,15 @@ pub mod scanner;
 pub mod statement;
 pub mod token;
 pub mod token_type;
-
+use std::env;
 use crate::parser::*;
-use literal::*;
-use parser::*;
 use scanner::*;
-use std::fmt;
-
 use std::{
     fs,
     io::{self, Write},
 };
-use token::*;
-use token_type::*;
+use interpreter::*;
+///
 ///
 ///expression     → equality ;
 ///equality       → comparison ( ( "!=" | "==" ) comparison )* ;
@@ -34,6 +30,7 @@ use token_type::*;
 ///               | "(" expression ")" ;
 ///
 
+#[allow(dead_code)]
 fn run_file(file: &String) {
     let bytes = fs::read_to_string(file).expect("Error reading external file.");
 
@@ -55,34 +52,39 @@ fn run_prompt() {
 }
 
 fn run(source: &String) -> Result<(), String> {
-    let mut input = "(+);".to_string();
     let mut scanner = Scanner::new(source.to_string());
     let tokens = scanner.scan_tokens();
 
     let mut parser = Parser::new(tokens.to_vec());
+    dbg!(&parser);
+    let expression = parser.parse_expression().unwrap();
+    let mut interpreter = Interpreter::new();
+    let result = interpreter.evaluate(&expression).unwrap();
 
-    let mut expression = parser.expression();
-
-    for token in tokens {
-        println!("{:?}", token);
-    }
-
+    println!("{}", result);
     Ok(())
 }
 
 fn main() {
-    println!("Hello, world!");
+    let args = env::args().collect::<Vec<String>>();
+    match args.len() {
+        2 => todo!(), // FIXME Implement file handling.
+        1 => {
+            let _ = run_prompt();
+        },
+        _ => unreachable!()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::environment::*;
-    use crate::interpreter::*;
-    use crate::lox_error::*;
     use crate::object::*;
-    use crate::scanner;
-    use crate::statement::*;
+    use crate::token::*;
+    use crate::token_type::*;
+    use crate::literal::*;
+
     #[test]
     fn define_test() {
         let mut env = Environment::new();
@@ -110,7 +112,7 @@ mod tests {
 
     #[test]
     fn scanner_test() {
-        let mut input = "(+);".to_string();
+        let input = "(+);".to_string();
 
         let mut scanner = Scanner::new(input);
 
@@ -155,7 +157,7 @@ mod tests {
 
     #[test]
     fn free_form_code_test() {
-        let mut input = "/".to_string();
+        let input = "/".to_string();
         let mut scanner = Scanner::new(input);
 
         scanner.scan_tokens();
@@ -181,7 +183,7 @@ mod tests {
 
     #[test]
     fn number_parsing_test() {
-        let mut input = "1+2".to_string();
+        let input = "1+2".to_string();
         let mut scanner = Scanner::new(input);
 
         scanner.scan_tokens();

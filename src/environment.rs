@@ -1,7 +1,6 @@
 use crate::object::*;
 use std::collections::HashMap;
 use crate::token::*;
-use crate::lox_error::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -31,23 +30,26 @@ impl Environment {
     }
     
     pub fn assign(&mut self, name: &Token, value: Object) {
-        match self.values.get(&name.lexeme) {
-            Some(_) => {
-                self.values.insert(name.lexeme.clone(), value);
-                
-            },
-            None => unimplemented!()
+        let variable = name.lexeme();
+        dbg!(&variable);
+        match self.values.insert(variable, value.clone()) {
+            Some(_) => {},
+            None => {
+                if let Some(enclosing) = &self.enclosing {
+                    (*enclosing.borrow_mut()).assign(name, value.clone());
+                } else {
+                    panic!("Variable not found in scope.")
+                }
+            }
         }
     }
     
     pub fn get(&mut self, name: Token) -> Object {
         if let Some(value) = self.values.get(&name.lexeme()) {
-            return value.clone()
-        }
-        
-        if let Some(enclosing) = &self.enclosing{
+            value.clone()
+        } else if let Some(enclosing) = &self.enclosing {
             return (*enclosing.borrow_mut()).get(name.clone())
         }
-        else { todo!() }
+        else { Object::Nil }
     }
 }

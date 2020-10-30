@@ -1,5 +1,4 @@
 use crate::expression::*;
-use crate::lox_error::*;
 use crate::object::*;
 use crate::token::*;
 
@@ -62,11 +61,11 @@ pub trait StmtVisitor {
 }
 
 pub trait Visitable {
-    fn accept(&self, expr: &mut StmtVisitor<Value = Object>) -> Option<Object>;
+    fn accept(&self, expr: &mut dyn StmtVisitor<Value = Object>) -> Option<Object>;
 }
 
 impl Visitable for Statement {
-    fn accept(&self, visitor: &mut StmtVisitor<Value = Object>) -> Option<Object> {
+    fn accept(&self, visitor: &mut dyn StmtVisitor<Value = Object>) -> Option<Object> {
         match self {
             Self::Expression { expression } => visitor.visit_expression_stmt(&self, &expression),
             Self::Print { expression } => visitor.visit_print_stmt(&self, &expression),
