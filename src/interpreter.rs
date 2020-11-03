@@ -17,20 +17,6 @@ pub struct Interpreter {
 
 impl StmtVisitor for Interpreter {
     type Value = Object;
-    fn visit_while_statement(
-        &mut self,
-        _stmt: &Statement,
-        condition: &Box<Expr>,
-        body: &Box<Statement>
-    ) -> Option<Object>{
-        let condition = self.evaluate(condition).unwrap();
-        let is_truthy = self.is_truthy(condition);
-        while is_truthy == Object::Boolean(true) {
-            self.execute(body);
-        }
-
-        return Some(Object::Nil);
-    }
     fn visit_block_statement(
         &mut self,
         _stmt: &Statement,
@@ -44,32 +30,12 @@ impl StmtVisitor for Interpreter {
         );
         None
     }
-    fn visit_if_statement(
-        &mut self,
-        _stmt: &Statement,
-        condition: &Box<Expr>,
-        then_branch: &Box<Statement>,
-        else_branch: &Option<Box<Statement>>,
-    ) -> Option<Object> {
-        let condition = self.evaluate(condition).unwrap();
-        let is_truthy = self.is_truthy(condition);
-
-        match is_truthy {
-            Object::Boolean(true) => self.execute(then_branch),
-            _ => {
-                if !else_branch.is_none() {
-                    self.execute(&else_branch.clone().unwrap());
-                }
-                None
-        }
-        }
-    }
     fn visit_expression_stmt(
         &mut self,
         _stmt: &Statement,
         expression: &Box<Expr>,
     ) -> Option<Object> {
-        self.evaluate(expression);
+        self.evaluate(expression).ok();
         None
     }
 
@@ -100,34 +66,35 @@ impl StmtVisitor for Interpreter {
 impl ExprVisitor for Interpreter {
     type Value = Object;
 
-    fn visit_logical_expression(
-        &mut self,
-        left: &Box<Expr>,
-        operator: &Token,
-        right: &Box<Expr>,
-    ) -> Result<Self::Value, LoxError> {
-        let left_expr = self.evaluate(left).unwrap();
-        let is_truthy: Object = self.is_truthy(left_expr.clone());
+    //fn visit_logical_expression(
+    //    &mut self,
+    //    _expr: &Expr,
+    //    left: &Box<Expr>,
+    //    operator: &Token,
+    //    right: &Box<Expr>,
+    //) -> Result<Self::Value, LoxError> {
+    //    let left_expr = self.evaluate(left).unwrap();
+    //    let is_truthy: Object = self.is_truthy(left_expr.clone());
 
-        if operator.of_type == TokenType::OR {
-            match is_truthy {
-                Object::Boolean(true) => Ok(left_expr),
-                _ => self.evaluate(right)
-            }
-        } else {
-            match is_truthy {
-                Object::Boolean(false) => Ok(left_expr),
-                _ => self.evaluate(right),
-            }
-        }
-    }
+    //    if operator.of_type == TokenType::OR {
+    //        match is_truthy {
+    //            Object::Boolean(true) => Ok(left_expr),
+    //            _ => self.evaluate(right)
+    //        }
+    //    } else {
+    //        match is_truthy {
+    //            Object::Boolean(false) => Ok(left_expr),
+    //            _ => self.evaluate(right),
+    //        }
+    //    }
+    //}
     fn visit_assign_expression(
         &mut self,
-        expr: &Box<Expr>,
         name: &Token,
+        value: &Box<Expr>,
     ) -> Result<Self::Value, LoxError> {
-        let value = self.evaluate(expr)?;
-
+        let value = self.evaluate(value)?;
+        
         self.environment.borrow_mut().assign(name, value.clone());
 
         return Ok(value);
@@ -137,7 +104,6 @@ impl ExprVisitor for Interpreter {
     }
     fn visit_binary_expression(
         &mut self,
-        _expr: &Expr,
         left: &Box<Expr>,
         operator: &Token,
         right: &Box<Expr>,
@@ -162,7 +128,6 @@ impl ExprVisitor for Interpreter {
 
     fn visit_group_expression(
         &mut self,
-        _expr: &Expr,
         content: &Box<Expr>,
     ) -> Result<Self::Value, LoxError> {
         self.evaluate(content)
@@ -170,7 +135,6 @@ impl ExprVisitor for Interpreter {
 
     fn visit_literal_expression(
         &mut self,
-        _expr: &Expr,
         literal: &Literal,
     ) -> Result<Self::Value, LoxError> {
         return Ok(Object::from_literal(literal));
@@ -178,7 +142,6 @@ impl ExprVisitor for Interpreter {
 
     fn visit_unary_expression(
         &mut self,
-        _expr: &Expr,
         operator: &Token,
         right: &Box<Expr>,
     ) -> Result<Self::Value, LoxError> {
@@ -205,10 +168,12 @@ impl Interpreter {
         expr.accept(self)
     }
 
-    pub fn interpret(&mut self, stmt: &Vec<Box<Statement>>) {
+    pub fn interpret(&mut self, stmt: &Vec<Box<Statement>>) -> Result<(), LoxError> {
         for statement in stmt {
             self.execute(statement);
         }
+
+        Ok(())
     }
     pub fn is_truthy(&mut self, result: Object) -> Object {
         match result {

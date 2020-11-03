@@ -9,14 +9,15 @@ pub mod scanner;
 pub mod statement;
 pub mod token;
 pub mod token_type;
-use std::env;
 use crate::parser::*;
+use interpreter::*;
+use statement::*;
 use scanner::*;
+use std::env;
 use std::{
     fs,
     io::{self, Write},
 };
-use interpreter::*;
 ///
 ///
 ///expression     → equality ;
@@ -30,49 +31,95 @@ use interpreter::*;
 ///               | "(" expression ")" ;
 ///
 
-#[allow(dead_code)]
-fn run_file(file: &String) {
-    let bytes = fs::read_to_string(file).expect("Error reading external file.");
-
-    run(&bytes);
+pub struct Lox {
+    had_error: bool,
+    had_rundtime_error: bool,
+    interpreter: Interpreter,
 }
 
-fn run_prompt() {
-    let buffer = io::stdin();
-    let mut stdout = io::stdout();
-    let mut source = String::new();
-    loop {
-        print!("> ");
-        stdout.flush();
-        source.clear();
-        buffer.read_line(&mut source).expect("Error handling input");
-
-        run(&source);
+impl Lox {
+    pub fn new() -> Self {
+        Self {
+            had_error: false,
+            had_rundtime_error: false,
+            interpreter: Interpreter::new(),
+        }
     }
-}
+    #[allow(dead_code)]
+    fn run_file(&mut self, file: &String) {
+        let bytes = fs::read_to_string(file).expect("Error reading external file.");
 
-fn run(source: &String) -> Result<(), String> {
-    let mut scanner = Scanner::new(source.to_string());
-    let tokens = scanner.scan_tokens();
+        self.run(&bytes);
+    }
 
-    let mut parser = Parser::new(tokens.to_vec());
-    dbg!(&parser);
-    let expression = parser.parse_expression().unwrap();
-    let mut interpreter = Interpreter::new();
-    let result = interpreter.evaluate(&expression).unwrap();
+    fn run_prompt(&mut self, ) {
+        let buffer = io::stdin();
+        let mut stdout = io::stdout();
+        let mut source = String::new();
+        loop {
+            print!("> ");
+            stdout.flush();
+            source.clear();
+            buffer.read_line(&mut source).expect("Error handling input");
 
-    println!("{}", result);
-    Ok(())
+            self.run(&source);
+        }
+    }
+
+    fn run(&mut self, source: &String) {
+        let mut scanner = Scanner::new(source.to_string());
+        let tokens = scanner.scan_tokens();
+        let mut parser: Parser = Parser::new(tokens.to_vec());
+
+        match parser.parse() {
+            Ok(statements) => {
+                let mut did_evaluate_single_expression = false;
+                if statements.len() == 1 {
+                    let first = statements[0].clone();
+                    match *first {
+                        Statement::Expression { expression } => {
+                            did_evaluate_single_expression = true;
+
+                            match self.interpreter.evaluate(&expression) {
+                                Ok(r) => println!("{}", r),
+                                Err(_) => {
+                                    self.had_rundtime_error = true;
+                                }
+                            }
+                        }
+
+                        _ => (),
+                    }
+                }
+
+                if !did_evaluate_single_expression {
+                    match self.interpreter.interpret(&statements) {
+                        Ok(()) => (),
+                        Err(_) => {
+                            self.had_rundtime_error = true;
+                        }
+                    }
+                }
+            }
+
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                self.had_error = true;
+            }
+        }
+    }
 }
 
 fn main() {
     let args = env::args().collect::<Vec<String>>();
+    let mut lox = Lox::new();
+
     match args.len() {
         2 => todo!(), // FIXME Implement file handling.
         1 => {
-            let _ = run_prompt();
-        },
-        _ => unreachable!()
+            let _ = lox.run_prompt();
+        }
+        _ => (), 
     }
 }
 
@@ -80,10 +127,10 @@ fn main() {
 mod tests {
     use super::*;
     use crate::environment::*;
+    use crate::literal::*;
     use crate::object::*;
     use crate::token::*;
     use crate::token_type::*;
-    use crate::literal::*;
 
     #[test]
     fn define_test() {

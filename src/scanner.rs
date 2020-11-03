@@ -79,6 +79,8 @@ impl Scanner {
             '=' => {
                 if self.advance_if_then('=') {
                     self.add_token(TokenType::EQUAL_EQUAL, None)
+                } else {
+                    self.add_token(TokenType::EQUAL, None)
                 }
             }
             '<' => {
@@ -122,19 +124,23 @@ impl Scanner {
             self.advance();
         }
 
-        let text = self.source[self.start..self.current].trim();
-        
-        if let Some(token_type) = self.match_identifier(text.to_string()) {
-            // Keyword match.
-            self.add_token(token_type, None)
-        } else {
-            // User defined identifier.
-            self.add_token(TokenType::IDENTIFIER, None)
+        let identifier  = self.source[self.start..self.current].trim();
+        let token_type = self.match_identifier(identifier.to_string());
+        match token_type {
+            Some(token_type) => self.add_token(token_type, None),
+            None => self.add_token(TokenType::IDENTIFIER, Some(Literal::String(String::from(identifier))))
         }
+       // if let Some(token_type) = self.match_identifier(text.to_string()) {
+       //     // Keyword match.
+       //     self.add_token(token_type, None)
+       // } else {
+       //     // User defined identifier.
+       //     self.add_token(TokenType::IDENTIFIER, None)
+       // }
     }
 
     // Returns Some(TokenType) if any of the identifiers matches.
-    pub fn match_identifier(&mut self, c: String) -> Option<TokenType> {
+    pub fn match_identifier(&self, c: String) -> Option<TokenType> {
         match c.as_str() {
             "else" => Some(TokenType::ELSE),
             "and" => Some(TokenType::AND),

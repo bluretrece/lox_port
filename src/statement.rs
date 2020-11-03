@@ -4,15 +4,6 @@ use crate::token::*;
 
 #[derive(Clone)]
 pub enum Statement {
-    While {
-        condition: Box<Expr>,
-        body: Box<Statement>,
-    },
-    If {
-        condition: Box<Expr>,
-        then_branch: Box<Statement>,
-        else_branch: Option<Box<Statement>>,
-    },
     Print {
         expression: Box<Expr>,
     },
@@ -44,20 +35,6 @@ pub trait StmtVisitor {
         _stmt: &Statement,
         statements: &Vec<Box<Statement>>,
     ) -> Option<Self::Value>;
-
-    fn visit_if_statement(
-        &mut self,
-        stmt: &Statement,
-        condition: &Box<Expr>,
-        then_branch: &Box<Statement>,
-        else_branch: &Option<Box<Statement>>,
-    ) -> Option<Self::Value>;
-    fn visit_while_statement(
-        &mut self,
-        _stmt: &Statement,
-        condition: &Box<Expr>,
-        body: &Box<Statement> 
-    ) -> Option<Self::Value>;
 }
 
 pub trait Visitable {
@@ -73,12 +50,12 @@ impl Visitable for Statement {
                 visitor.visit_var_stmt(&self, &name, &initializer)
             }
             Self::Block { statements } => visitor.visit_block_statement(&self, statements),
-            Self::While { condition, body } => visitor.visit_while_statement(&self, condition, body),
-            Self::If {
-                condition,
-                then_branch,
-                else_branch,
-            } => visitor.visit_if_statement(&self, condition, then_branch, else_branch),
+            //Self::While { condition, body } => visitor.visit_while_statement(&self, condition, body),
+            // Self::If {
+            //     condition,
+            //     then_branch,
+            //     else_branch,
+            // } => visitor.visit_if_statement(&self, condition, then_branch, else_branch),
         }
     }
 }

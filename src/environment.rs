@@ -31,7 +31,7 @@ impl Environment {
     
     pub fn assign(&mut self, name: &Token, value: Object) {
         let variable = name.lexeme();
-        dbg!(&variable);
+        
         match self.values.insert(variable, value.clone()) {
             Some(_) => {},
             None => {
