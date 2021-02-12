@@ -31,15 +31,15 @@ impl Scanner {
         self.source.chars().nth(self.current - 1).unwrap()
     }
 
-    pub fn add_token(&mut self, of_type: TokenType, literal: Option<Literal>) {
-        self.add_token_val(of_type, literal)
+    pub fn add_token(&mut self, of_type: TokenType, literal: Option<Literal>, line: usize) {
+        self.add_token_val(of_type, literal, line)
     }
 
-    pub fn add_token_val(&mut self, of_type: TokenType, literal: Option<Literal>) {
+    pub fn add_token_val(&mut self, of_type: TokenType, literal: Option<Literal>, line: usize) {
         let text = &self.source[self.start..self.current];
 
         self.tokens
-            .push(Token::new(of_type, text.to_string(), literal, self.line))
+            .push(Token::new(of_type, text.to_string(), literal, line))
     }
 
     pub fn advance_if_then(&mut self, next: char) -> bool {
@@ -56,41 +56,45 @@ impl Scanner {
         let c = self.advance();
 
         match c {
-            '(' => self.add_token(TokenType::LEFT_PAREN, None),
-            ')' => self.add_token(TokenType::RIGHT_PAREN, None),
-            '{' => self.add_token(TokenType::LEFT_BRACE, None),
-            '}' => self.add_token(TokenType::RIGHT_BRACE, None),
-            ',' => self.add_token(TokenType::COMMA, None),
-            '.' => self.add_token(TokenType::DOT, None),
-            '-' => self.add_token(TokenType::MINUS, None),
-            '+' => self.add_token(TokenType::PLUS, None),
-            ';' => self.add_token(TokenType::SEMICOLON, None),
-            '*' => self.add_token(TokenType::STAR, None),
+            '(' => self.add_token(TokenType::LEFT_PAREN, None, self.line),
+            ')' => self.add_token(TokenType::RIGHT_PAREN, None, self.line),
+            '{' => self.add_token(TokenType::LEFT_BRACE, None,self.line),
+            '}' => self.add_token(TokenType::RIGHT_BRACE, None, self.line),
+            ',' => self.add_token(TokenType::COMMA, None, self.line),
+            '.' => self.add_token(TokenType::DOT, None, self.line),
+            '-' => self.add_token(TokenType::MINUS, None, self.line),
+            '+' => self.add_token(TokenType::PLUS, None, self.line),
+            ';' => self.add_token(TokenType::SEMICOLON, None, self.line),
+            '*' => self.add_token(TokenType::STAR, None, self.line),
             'o' => {
                 if self.advance_if_then('r') {
-                    self.add_token(TokenType::OR, None)
+                    self.add_token(TokenType::OR, None, self.line)
                 }
             }
             '!' => {
                 if self.advance_if_then('=') {
-                    self.add_token(TokenType::BANG_EQUAL, None)
+                    self.add_token(TokenType::BANG_EQUAL, None, self.line)
                 }
             }
             '=' => {
                 if self.advance_if_then('=') {
-                    self.add_token(TokenType::EQUAL_EQUAL, None)
+                    self.add_token(TokenType::EQUAL_EQUAL, None, self.line)
                 } else {
-                    self.add_token(TokenType::EQUAL, None)
+                    self.add_token(TokenType::EQUAL, None, self.line)
                 }
             }
             '<' => {
                 if self.advance_if_then('=') {
-                    self.add_token(TokenType::LESS_EQUAL, None)
+                    self.add_token(TokenType::LESS_EQUAL, None, self.line)
+                } else {
+                    self.add_token(TokenType::LESS, None, self.line)
                 }
             }
             '>' => {
                 if self.advance_if_then('=') {
-                    self.add_token(TokenType::GREATER_EQUAL, None)
+                    self.add_token(TokenType::GREATER_EQUAL, None, self.line)
+                } else {
+                    self.add_token(TokenType::GREATER, None, self.line)
                 }
             }
             '/' => {
@@ -99,7 +103,7 @@ impl Scanner {
                         self.advance();
                     }
                 } else {
-                    self.add_token(TokenType::SLASH, None);
+                    self.add_token(TokenType::SLASH, None, self.line);
                 }
             }
             ' ' | '\r' | '\t' => (),
@@ -120,6 +124,7 @@ impl Scanner {
     }
 
     pub fn identifier(&mut self) {
+
         while self.is_alphanumeric(self.peek()) {
             self.advance();
         }
@@ -127,8 +132,8 @@ impl Scanner {
         let identifier  = self.source[self.start..self.current].trim();
         let token_type = self.match_identifier(identifier.to_string());
         match token_type {
-            Some(token_type) => self.add_token(token_type, None),
-            None => self.add_token(TokenType::IDENTIFIER, Some(Literal::String(String::from(identifier))))
+            Some(token_type) => self.add_token(token_type, None, self.line),
+            None => self.add_token(TokenType::IDENTIFIER, Some(Literal::String(String::from(identifier))), self.line)
         }
        // if let Some(token_type) = self.match_identifier(text.to_string()) {
        //     // Keyword match.
@@ -198,7 +203,7 @@ impl Scanner {
         // TODO: f32 as well as f64 support.
 
         let parsed_lexeme = lexeme.parse::<i32>().expect("Unexpected parsing behaviour");
-        self.add_token(TokenType::NUMBER, Some(Literal::Number(parsed_lexeme)));
+        self.add_token(TokenType::NUMBER, Some(Literal::Number(parsed_lexeme)), self.line);
     }
 
     pub fn peek_next(&mut self) -> char {
@@ -227,7 +232,7 @@ impl Scanner {
         let value = self.source[self.start + 1..self.current - 1]
             .chars()
             .collect::<String>();
-        self.add_token(TokenType::STRING, Some(Literal::String(value)));
+        self.add_token(TokenType::STRING, Some(Literal::String(value)), self.line);
     }
 
     // advance()-like function, but doesn't consumes the character.

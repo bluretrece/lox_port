@@ -1,0 +1,6 @@
+fun args(a, b) {
+		print a + b;
+}
+
+var c = args(1, 2);
+print c;

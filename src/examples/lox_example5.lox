@@ -1,0 +1,11 @@
+fun sum() 
+{
+	var a = 1;
+	var b = 3;
+	var c = a + b;
+
+	return c;
+}
+
+var c = sum();
+print c;

@@ -1,5 +1,6 @@
 use std::fmt;
-#[derive(Debug,PartialEq,Clone, PartialOrd, Eq)]
+
+#[derive(Debug,PartialEq,Clone, PartialOrd, Eq, Hash)]
 pub enum Literal {
     String(String),
     Number(i32),

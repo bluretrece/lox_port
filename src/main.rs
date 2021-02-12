@@ -3,33 +3,25 @@ pub mod expression;
 pub mod interpreter;
 pub mod literal;
 pub mod lox_error;
+pub mod natives;
 pub mod object;
 pub mod parser;
+pub mod resolver;
 pub mod scanner;
 pub mod statement;
 pub mod token;
 pub mod token_type;
+use crate::object::Object;
 use crate::parser::*;
+use crate::resolver::Resolver;
 use interpreter::*;
-use statement::*;
 use scanner::*;
+use statement::*;
 use std::env;
 use std::{
     fs,
     io::{self, Write},
 };
-///
-///
-///expression     → equality ;
-///equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-///comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
-///addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
-///multiplication → unary ( ( "/" | "*" ) unary )* ;
-///unary          → ( "!" | "-" ) unary
-///               | primary ;
-///primary        → NUMBER | STRING | "false" | "true" | "nil"
-///               | "(" expression ")" ;
-///
 
 pub struct Lox {
     had_error: bool,
@@ -52,7 +44,7 @@ impl Lox {
         self.run(&bytes);
     }
 
-    fn run_prompt(&mut self, ) {
+    fn run_prompt(&mut self) {
         let buffer = io::stdin();
         let mut stdout = io::stdout();
         let mut source = String::new();
@@ -65,46 +57,56 @@ impl Lox {
             self.run(&source);
         }
     }
-
+    pub fn resolve(&mut self, statements: &Vec<Box<Statement>>) -> LoxResult<Object> {
+        let mut r = Resolver::new(&mut self.interpreter);
+        r.resolve(statements)
+    }
     fn run(&mut self, source: &String) {
         let mut scanner = Scanner::new(source.to_string());
         let tokens = scanner.scan_tokens();
         let mut parser: Parser = Parser::new(tokens.to_vec());
 
         match parser.parse() {
-            Ok(statements) => {
-                let mut did_evaluate_single_expression = false;
-                if statements.len() == 1 {
-                    let first = statements[0].clone();
-                    match *first {
-                        Statement::Expression { expression } => {
-                            did_evaluate_single_expression = true;
-
-                            match self.interpreter.evaluate(&expression) {
-                                Ok(r) => println!("{}", r),
-                                Err(_) => {
-                                    self.had_rundtime_error = true;
-                                }
-                            }
-                        }
-
-                        _ => (),
-                    }
+            Ok(statements) => match self.resolve(&statements) {
+                Ok(_) => {
+                    self.run_statements(&statements);
                 }
+                Err(_) => (),
+            },
 
-                if !did_evaluate_single_expression {
-                    match self.interpreter.interpret(&statements) {
-                        Ok(()) => (),
+            Err(e) => {
+                eprintln!("Error: {}", e);
+                self.had_error = true;
+            }
+        }
+    }
+
+    fn run_statements(&mut self, statements: &Vec<Box<Statement>>) {
+        let mut did_evaluate_single_expression = false;
+        if statements.len() == 1 {
+            let first = statements[0].clone();
+            match *first {
+                Statement::Expression { expression } => {
+                    did_evaluate_single_expression = true;
+
+                    match self.interpreter.evaluate(&expression) {
+                        Ok(r) => println!("{}", r),
                         Err(_) => {
                             self.had_rundtime_error = true;
                         }
                     }
                 }
-            }
 
-            Err(e) => {
-                eprintln!("Error: {}", e);
-                self.had_error = true;
+                _ => (),
+            }
+        }
+
+        if !did_evaluate_single_expression {
+            match self.interpreter.interpret(&statements) {
+                Ok(()) => (),
+                Err(_) => {
+                    self.had_rundtime_error = true;
+                }
             }
         }
     }
@@ -115,11 +117,11 @@ fn main() {
     let mut lox = Lox::new();
 
     match args.len() {
-        2 => todo!(), // FIXME Implement file handling.
+        2 => lox.run_file(&args[1]),
         1 => {
             let _ = lox.run_prompt();
         }
-        _ => (), 
+        _ => (),
     }
 }
 
@@ -153,7 +155,7 @@ mod tests {
 
         for (name, value) in definitions {
             env.define(&name.lexeme, &value);
-            assert_eq!(env.get(name), value);
+            assert_eq!(env.get(&name), value);
         }
     }
 
@@ -281,6 +283,49 @@ mod tests {
             let result = interpreter.evaluate(&expr).unwrap();
 
             assert_eq!(result, expected_result);
+        }
+    }
+
+    #[test]
+    fn for_while_test() {
+        // TODO suppot break keyword.
+        //
+        // TODO Check if errors exists.
+        let program = vec![(
+            r#"
+var a = 0;
+var temp;
+
+for (var b = 1; a < 10000; b = temp + b) {
+  print a;
+  temp = a;
+  a = b;
+}
+                "#,
+            vec![("a", Object::Number(0))],
+        )];
+
+        for (program, expected_results) in program {
+            let mut scanner = scanner::Scanner::new(program.to_string());
+            let tokens = scanner.scan_tokens();
+            let mut parser = parser::Parser::new(tokens.to_vec());
+            let statements = parser.parse().unwrap();
+
+            let mut lox = Lox::new();
+            let mut errors_founds: i32 = 0;
+
+            lox.interpreter
+                .interpret(&statements)
+                .map_err(|_| errors_founds += 1);
+
+            for (name, value) in expected_results {
+                let token = Token::new(TokenType::IDENTIFIER, String::from(name), None, 1);
+                assert_eq!(
+                    lox.interpreter.environment().borrow_mut().get(&token),
+                    value
+                );
+                print!("{}", errors_founds);
+            }
         }
     }
 

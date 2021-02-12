@@ -3,14 +3,31 @@ use std::cmp::{Ordering, PartialOrd};
 use std::fmt;
 use crate::literal::*;
 use crate::lox_error::*;
+use crate::interpreter::LoxCallable;
+use std::cell::RefCell;
+use std::rc::Rc;
 
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug,Clone)]
 pub enum Object {
     Boolean(bool),
+    Callable(Rc<RefCell<dyn LoxCallable>>),
     Number(i32),
     Str(String),
     Nil,
+}
+
+impl PartialEq for Object {
+    fn eq(&self, _other: &Self) -> bool {
+        use Object::*;
+        match (self, _other) {
+            (Boolean(b1), Boolean(b2)) => b1 == b2,
+            (Callable(c1), Callable(c2)) => c1 == c2,
+            (Nil, Nil) => true,
+            (Number(n1), Number(n2)) => n1 == n2,
+            (Str(s1), Str(s2)) => s1 == s2,
+            _ => false
+        }
+    }
 }
 
 impl fmt::Display for Object {
@@ -19,7 +36,8 @@ impl fmt::Display for Object {
             Self::Boolean(b) => write!(f, "{}", b),
             Self::Number(x) => write!(f, "{}", x),
             Self::Str(s) => write!(f, "{}", s),
-            Self::Nil=> write!(f,"Nil"),
+            Self::Nil => write!(f,"Nil"),
+            Self::Callable(c) => write!(f, "{}",c.borrow()), 
         }
     }
 }
@@ -48,7 +66,8 @@ impl Neg for Object {
             Object::Nil => Ok(Object::Boolean(true)),
             Object::Number(x) => Ok(Object::Number(-x)),
             Object::Boolean(_) => Err(String::from("Operation not supported")),
-            Object::Str(_) => Err(String::from("Operation not supported"))
+            Object::Str(_) => Err(String::from("Operation not supported")),
+            _ => Err("fn".to_string())
         }
     }
 }
@@ -116,7 +135,7 @@ impl Add for Object {
             Object::Number(value) => match rhs {
                 Object::Number(rhs_value) => Ok(Object::Number(value + rhs_value)),
                 _ => Err(LoxError::RuntimeError(
-                    "right hand side must also be a number".to_string(),
+                    "Right hand side must also be a number".to_string(),
                 )),
             },
             Object::Str(value) => match rhs {
@@ -133,9 +152,11 @@ impl Add for Object {
             Object::Nil => Err(LoxError::RuntimeError(
                 "Cannot add value to nil.".to_string(),
             )),
+            _ => Err(LoxError::RuntimeError(String::from("Can't add functions")))
         }
     }
 }
+
 
 impl Object {
     pub fn from_literal(literal: &Literal) -> Self {
