@@ -34,6 +34,10 @@ pub enum Statement {
         name: Token,
         initializer: Option<Box<Expr>>,
     },
+    Class {
+        name: Token,
+        methods: Vec<Box<Statement>>,
+    },
 
     Block {
         statements: Vec<Box<Statement>>,
@@ -47,6 +51,7 @@ pub enum Statement {
 
 pub trait StmtVisitor {
     type Value;
+    fn visit_class_stmt(&mut self, name: &Token) -> LoxResult<Self::Value>;
     fn visit_return_statement(
         &mut self,
         keyword: &Token,
@@ -88,6 +93,7 @@ pub trait Visitable {
 impl Visitable for Statement {
     fn accept(&self, visitor: &mut dyn StmtVisitor<Value = Object>) -> LoxResult<Object> {
         match self {
+            Self::Class { name, methods} => visitor.visit_class_stmt(name),
             Self::Return { keyword, value } => visitor.visit_return_statement(keyword, value),
             Self::Function { name, params, body } => visitor.visit_function_statement(&self, name, params, body),
             Self::Expression { expression } => visitor.visit_expression_stmt(&self, &expression),

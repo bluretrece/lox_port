@@ -1,4 +1,5 @@
 use crate::lox_error::LoxError;
+use crate::lox_class::LoxClass;
 use crate::object::*;
 use crate::token::*;
 use std::cell::RefCell;

@@ -116,6 +116,11 @@ impl<'a> Resolver<'a> {
 
 impl<'a> ExprVisitor for Resolver<'a> {
     type Value = Object;
+
+    fn visit_get_expression(&mut self, expr: &Expr, object: &Box<Expr>, name: &Token) -> LoxResult<Self::Value> {
+        self.resolve_expression(object);
+        Ok(Object::Nil)
+    }
     fn visit_call_expression(
         &mut self,
         callee: &Box<Expr>,
@@ -279,13 +284,23 @@ impl<'a> StmtVisitor for Resolver<'a> {
         Ok(Object::Nil)
     }
 
+    fn visit_class_stmt(
+        &mut self,
+       name: &Token 
+    ) -> LoxResult<Object> {
+        self.declare(name)?;
+        self.define(name);
+
+        Ok(Object::Nil)
+    }
+
     fn visit_var_stmt(
         &mut self,
         _stmt: &Statement,
         name: &Token,
         initializer: &Option<Box<Expr>>,
     ) -> LoxResult<Object> {
-        self.declare(name);
+        self.declare(name)?;
 
         if let Some(initializer) = initializer {
             self.resolve_expression(initializer)?;

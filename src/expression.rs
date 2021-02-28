@@ -26,6 +26,11 @@ pub enum Expr {
         literal: Literal,
     },
 
+    Get {
+        object: Box<Expr>,
+        name: Token,
+    },
+
     Call {
         callee: Box<Expr>,
         paren: Token,
@@ -77,6 +82,11 @@ pub trait ExprVisitor {
         literal: &Literal,
     ) -> LoxResult<Self::Value>;
 
+    fn visit_get_expression(&mut self,
+        expr: &Expr,
+        object: &Box<Expr>,
+        name: &Token) -> LoxResult<Self::Value>;
+
     fn visit_unary_expression(
         &mut self,
         operator: &Token,
@@ -100,12 +110,13 @@ pub trait Visitable {
 impl Visitable for Expr {
     fn accept(&self, expr: &mut dyn ExprVisitor<Value=Object>) -> LoxResult<Object> {
         match self {
+            Expr::Get {object, name} => expr.visit_get_expression(&self, object, name),
             Expr::Binary {
                 left,
                operator,
                 right,
             } => expr.visit_binary_expression(&left, &operator, &right),
-            Expr::Grouping { expression } => expr.visit_group_expression(&expression),
+            Expr::Grouping {expression} => expr.visit_group_expression(&expression),
             Expr::Literal { literal } => expr.visit_literal_expression(&literal),
             Expr::Logical {left, operator, right} => expr.visit_logical_expression(&self, &left, &operator, &right),
             Expr::Assign {name, value} => expr.visit_assign_expression(&self, &name, &value),

@@ -1,4 +1,5 @@
 use crate::environment::Environment;
+use crate::lox_class::LoxClass;
 use crate::expression::Visitable;
 use crate::expression::*;
 use crate::literal::*;
@@ -32,7 +33,15 @@ pub struct Interpreter {
 
 impl StmtVisitor for Interpreter {
     type Value = Object;
+    
+    fn visit_class_stmt(&mut self, name: &Token) -> LoxResult<Object> {
+        self.environment.borrow_mut().define(&name.lexeme(), &Object::Nil);
+        let klass = Object::Class(LoxClass::new(name.lexeme()));
 
+        self.environment.borrow_mut().assign(name, klass);
+
+        Ok(Object::Nil)
+    }
     fn visit_return_statement(
         &mut self,
         _keyword: &Token,
@@ -230,6 +239,47 @@ impl PartialEq<dyn LoxCallable> for dyn LoxCallable {
 
 impl ExprVisitor for Interpreter {
     type Value = Object;
+    fn visit_get_expression(&mut self, expr: &Expr, object: &Box<Expr>, name: &Token) -> LoxResult<Self::Value> {
+        let object = self.evaluate(object)?;
+
+        match object {
+            Object::Instance(lox_instance) => {
+                match lox_instance.get(name) {
+                    Ok(obj) => {
+                        if let Object::Callable(callable) = &obj {
+                            if callable.borrow().is_property() {
+                                // this is a property field on a class instance, invoke it.
+                                if let Some(r) = callable.borrow().call(self, &vec![])? {
+                                    Ok(r)
+                                } else {
+                                    // Property didn't explicitly return anything - which is weird, but let's
+                                    // allow it because it could be desired that the property invocation causes a
+                                    // desired side-effect.
+                                    Ok(Object::Nil)
+                                }
+                            } else {
+                                Ok(obj)
+                            }
+                        } else {
+                            Ok(obj)
+                        }
+                    }
+                    Err(e) => Err(ReturnStatus::Error(e)),
+                }
+            }
+            Object::Class(lox_class) => match lox_class.get(name) {
+                Ok(obj) => Ok(obj),
+                Err(e) => Err(ReturnStatus::Error(e)),
+            },
+            _ => Err(InterpretResultStatus::Error(RuntimeError::new(
+                name,
+                "Only instances have properties.",
+            ))),
+        }
+
+
+        Ok(Object::Nil)
+    }
     fn visit_call_expression(
         &mut self,
         callee: &Box<Expr>,
@@ -539,6 +589,7 @@ impl Interpreter {
             Object::Str(_) => Object::Boolean(true),
             Object::Boolean(value) => Object::Boolean(value),
             Object::Callable(_) => Object::Boolean(true),
+            Object::Class(_) =>  Object::Boolean(true),
         }
     }
     pub fn execute(&mut self, stmt: &Box<Statement>) -> LoxResult<Object> {

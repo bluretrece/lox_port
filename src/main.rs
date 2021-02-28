@@ -1,3 +1,4 @@
+pub mod lox_class;
 pub mod environment;
 pub mod expression;
 pub mod interpreter;

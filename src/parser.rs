@@ -94,13 +94,39 @@ impl Parser {
 
         return Ok(statements);
     }
+   
+    pub fn class_declaration(&mut self) -> Result<Box<Statement>> {
+        let name = self.consume(TokenType::IDENTIFIER, String::from("Expect class name"))?;
+        self.consume(TokenType::LEFT_BRACE, String::from("
+                Expect '{' before class body.
+                "));
+        let mut methods = vec![];
+        while !self.check(&TokenType::RIGHT_BRACE) && !self.is_at_end() {
+                methods.push(self.function("function")?); 
+        }
+
+        self.consume(TokenType::LEFT_BRACE, String::from("
+                Expect '{' before class body.
+                "));
+
+        Ok(Box::new(
+                Statement::Class {
+                    name,
+                    methods
+                }
+        ))
+    }
 
     pub fn _declaration(&mut self) -> Result<Box<Statement>> {
         if self.if_match(&[TokenType::VAR]) {
             self.var_declaration()
         } else if self.if_match(&[TokenType::FUN]) {
             self.function("function")
-        } else {
+        } 
+        else if self.if_match(&[TokenType::CLASS]) {
+            self.class_declaration()
+        }
+        else {
             self.statement()
         }
     }
@@ -495,17 +521,26 @@ impl Parser {
 
     // Parses a function expression.
     pub fn call(&mut self) -> Result<Box<Expr>> {
-        let mut expr = self.primary();
+        let mut expr = self.primary()?;
 
         loop {
             if self.if_match(&vec![TokenType::LEFT_PAREN]) {
-                expr = self.finish_call(expr?);
-            } else {
+                expr = self.finish_call(expr)?;
+            } 
+
+            else if self.if_match(&[TokenType::DOT]) {
+                
+            let name = self.consume(TokenType::IDENTIFIER, String::from("Expected property name after '.' "))?;
+
+            expr = Box::new(Expr::Get { object: expr, name: name.clone() });
+            }
+
+            else {
                 break;
             }
         }
 
-        expr
+        Ok(expr)
     }
 
     // One can see the function's argument as a list of tokens.

@@ -6,12 +6,16 @@ use crate::lox_error::*;
 use crate::interpreter::LoxCallable;
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::lox_class::{LoxClass, Instance};
+
 
 #[derive(Debug,Clone)]
 pub enum Object {
     Boolean(bool),
     Callable(Rc<RefCell<dyn LoxCallable>>),
     Number(i32),
+    Instance(Instance),
+    Class(LoxClass),
     Str(String),
     Nil,
 }
@@ -33,6 +37,7 @@ impl PartialEq for Object {
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Class(c) => write!(f,"{}",c),
             Self::Boolean(b) => write!(f, "{}", b),
             Self::Number(x) => write!(f, "{}", x),
             Self::Str(s) => write!(f, "{}", s),
